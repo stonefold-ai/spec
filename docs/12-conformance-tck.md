@@ -18,7 +18,7 @@ report = run_conformance(MyDriver(), implementation="my-gateway 0.1")
 print(report.render())
 ```
 
-**If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — fourteen small JSON endpoints — start it, and run:
+**If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — seventeen small JSON endpoints — start it, and run:
 
 ```python
 from stonefold_tck import run_conformance
@@ -36,7 +36,7 @@ Stonefold TCK conformance report -- implementation: my-gateway 0.1
 [core]    CERTIFIED -- 12 pass, 0 fail, 0 skip
 [lint]    CERTIFIED -- 6 pass, 0 fail, 0 skip
 ...
-Certified profiles: core, lint, scope, staging, kill, audit, freshness
+Certified profiles: core, lint, scope, staging, kill, audit, freshness, batch, digest
 ```
 
 A profile is **certified** only when every one of its checks passed. A check skipped for a missing capability leaves the profile *incomplete* — a skip is never a pass, so a certification claim is always exactly as strong as what actually ran.
@@ -64,9 +64,14 @@ Driver obligations (the contract is `stonefold_tck/driver.py`, one docstring per
 | `audit()` | The decision log since `load` (decision, resource, action, outcome, reason) — `reason` is the deciding rule/settle reason; the v0.4 reasons (`stale-decision`, `stale-guard:<gate>`, `scope-lost`) are normative and MUST be populated by drivers claiming the v0.4 capabilities |
 | `inject_dispatch_failure(action)` | Make the next dispatch of that action fail at the connector |
 | `update_named_set(name, values)` | Replace a registry named set's values at runtime — a sanctions update landing between decision and dispatch (`freshness` capability) |
+| `submit_batch(actor, session_id, ops)` | Submit one multi-operation SIF batch, decided atomically (`batch` capability, v0.5 CS-023) — reports the batch verdict, the failing operation's index, and the per-operation results |
+| `connector_digest(name)` | The `sha256:<hex>` digest of the artifact currently implementing that connector, computed the way the gateway verifies a registry pin (`digest-pinning` capability, v0.5 CS-020) |
+| `tamper_connector(name)` | Swap the connector's implementation in place, without reloading policy — the supply-chain replacement the pin defends against (`digest-pinning` capability) |
 | `capabilities()` | Which optional obligations you support (missing ⇒ dependent checks SKIP) |
 
 Two capabilities are the v0.4 opt-ins: **`freshness`** declares that decision TTLs + volatile-gate re-validation are wired *with the REQUIRED TCK config* — default TTL **24 hours**, irreversible TTL **30 minutes** (the D5/D6 checks advance the clock against exactly these values, the same way §3 fixes the registered-function semantics); **`scope-reassert`** declares that the scope predicate is re-asserted at dispatch (either declared form — the TCK observes only the shared outcome).
+
+The v0.5 opt-ins follow the same pattern: **`batch`** declares atomic batch decision semantics (CS-023) behind `submit_batch`; **`digest-pinning`** declares connector digest verification at load and at dispatch (CS-020) behind `connector_digest`/`tamper_connector` — the TCK authors the pin itself from the reported digest, so no fixture hard-codes an implementation artifact. For a driver claiming `digest-pinning`, the dispatch-time mismatch settle reason **`connector-digest-mismatch`** is normative, like the v0.4 reasons.
 
 Determinism is the design principle: `dispatch_once` steps the worker instead of racing a background thread, and `set_clock` removes wall-time — so every check is reproducible on any implementation.
 
@@ -88,13 +93,15 @@ The fixture registry ships in the **authoring format** (docs/06) — the spec's 
 
 | Profile | Checks | Proves |
 |---|---|---|
-| `core` | A1–A3, C1–C9 | default deny, deny-wins, gate AND-combination; valueLimit, rate, allow/denylist, from-states, quantityCap, disclosure, contentCheck, fail-closed conditions, named preconditions |
+| `core` | A1–A3, C1–C10 | default deny, deny-wins, gate AND-combination; valueLimit, rate, allow/denylist, from-states, quantityCap, disclosure (sinks + the CS-024 classification order, fail-closed outside the declared order), contentCheck, fail-closed conditions, named preconditions |
 | `lint` | A4–A8 | invalid policies refuse to load (open-on-irreversible, unknown names incl. `deny`, standing∩deny, dual-auth quorum); warnings surfaced |
 | `scope` | B1–B3 | scope injected below the model; effects on out-of-scope targets denied pre-dispatch; payloads cannot widen scope |
 | `staging` | D1–D4 | effects staged by default and dispatched exactly once (idempotent); approvals hold/release/reject; dual-auth needs two distinct non-actor identities; failed irreversibles stage their declared compensation |
 | `kill` | E1, E2s, E6 | session/agent/action-class kills → HALT; kill before the dispatch step cancels; a committed effect is never claimed reversed; lifting restores |
 | `audit` | F1, F2c | every decision leaves a record; executed effects and success-audit records agree exactly |
 | `freshness` | D5, D5b, D6, D6b, D6c, B4 | v0.4 (CS-017/018): an expired decision cancels at claim (`stale-decision`) and a late approval cannot resurrect it; a denylist update between decision and dispatch cancels (`stale-guard:denylist`); counters and approval grants are NOT re-run; a target reassigned after the decision never receives the effect (`scope-lost`) |
+| `batch` | H1–H4 | v0.5 (CS-023): any DENY/HALT refuses the whole batch before anything commits or stages, naming the failing operation; a HOLD stages without refusing (record ops commit atomically with the staging); a later rejection does not roll committed ops back |
+| `digest` | I1–I3 | v0.5 (CS-020): a pinned digest mismatch fails closed at policy load; a post-decision implementation swap cancels the staged effect at dispatch, audited `connector-digest-mismatch`; a matching pin dispatches normally |
 
 ## 5. What the TCK deliberately does NOT test (and why)
 
@@ -109,10 +116,10 @@ A certification claim therefore reads "certifies TCK profiles X, Y, Z" — never
 
 ## 6. The wire binding (multi-language)
 
-The harness API is the driver contract as fourteen JSON endpoints — the full table with request/response shapes is in `stonefold_tck/http_driver.py`'s module docstring, and `stonefold_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
+The harness API is the driver contract as seventeen JSON endpoints — the full table with request/response shapes is in `stonefold_tck/http_driver.py`'s module docstring, and `stonefold_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
 
 Rules: the harness is **test builds only**; every endpoint returns 200 with a JSON body; timestamps are ISO-8601; a capability you don't advertise may leave its endpoint unimplemented.
 
 ## 7. Versioning
 
-The kit certifies against the RFC version pinned in this repo (v0.4 today). This is also the worked example of how the kit absorbs an RFC bump: v0.4's guarantees arrived as a **new profile** (`freshness`) behind **new capabilities** (`freshness`, `scope-reassert`) — a v0.3-level gateway still certifies the six original profiles unchanged (its missing capabilities SKIP the new checks, leaving `freshness` honestly incomplete), while a gateway claiming v0.4 certifies the seventh on top. Certifications stay meaningful because they name their profiles and kit version.
+The kit certifies against the RFC version pinned in this repo (v0.5 today). This is also the worked example of how the kit absorbs an RFC bump: v0.4's guarantees arrived as a **new profile** (`freshness`) behind **new capabilities** (`freshness`, `scope-reassert`), and v0.5's the same way (`batch` behind `batch`, `digest` behind `digest-pinning`) — an older gateway still certifies the original profiles unchanged (its missing capabilities SKIP the new checks, leaving the newer profiles honestly incomplete), while a gateway claiming the current version certifies them on top. Certifications stay meaningful because they name their profiles and kit version.

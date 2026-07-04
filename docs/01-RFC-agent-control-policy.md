@@ -1,15 +1,15 @@
-# Stele — Specification v0.4
+# Stele — Specification v0.5
 
 *The policy language for the SIF gateway: the declarative file that decides, deterministically, what an AI agent is permitted to do, and what is recorded when it tries.*
 
 > **Layering.** Stele is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). Stele references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; Stele = *what is allowed*.
 
-**Status:** Draft v0.4 (reference specification; supersedes v0.3). **Authors:** the agent-platform team.
+**Status:** Draft v0.5 (reference specification; supersedes v0.4). **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.4 promotes the two deferred timing guarantees (decision freshness, scope no-race) from *documented boundary* to *specified behaviour* — **no policy-file syntax changed**; `schema/stele.schema.json` is unchanged and existing `apiVersion: stele/v0.1` policy files remain valid as-is. CS-017 adds gateway behaviour + deployment configuration; CS-018 adds a declared connector capability (connector metadata, additive). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`. A **draft** set for the next revision is accumulating in `docs/RFC-changeset-v0.4-to-v0.5.md`.
+> **Compatibility:** v0.5 is **additive declarations, semantic completions, and text fixes** — no policy-file syntax changed, no new kinds/gates/operators (the frozen shape holds); `schema/stele.schema.json` is unchanged and existing `apiVersion: stele/v0.1` policy files remain valid as-is. CS-020 adds an optional registry declaration (connector `digest` pins); CS-023 specifies batch decision semantics (gateway behaviour); CS-024 pins the classification order `disclosure` compares by. Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`; v0.4 → v0.5 is `docs/RFC-changeset-v0.4-to-v0.5.md`.
 
-## Changelog — v0.4 → v0.5 (draft, accumulating)
+## Changelog — v0.4 → v0.5
 
 | ID | Type | §  | Summary |
 |----|------|----|---------|
@@ -17,7 +17,7 @@
 | CS-020 | ADDED | registry §5; §10 | **Connector digest pinning.** A connector declaration MAY pin its implementing artifact by `sha256` digest; when declared, the gateway MUST verify at policy load and at dispatch — mismatch is a dependency failure under §10 (fail closed, audited). Additive; existing registries unaffected. Reference implementation shipped (`stonefold_core.digest`). |
 | CS-021 | ADDED | arch. decision 11 | **Identity-provider seam.** The session's authenticated `actor:`/`agent:` identities come from an `IdentityProvider` protocol ahead of the pipeline; built-in default is the existing session/transport auth (no behavioural change). No credential scheme integrated or endorsed. Invariant 3 binds every provider. Reference implementation shipped (`stonefold_gateway.identity`). |
 | CS-022 | FIXED | §9 | **Kill wording reconciled with the two axes.** The operator hard-kill is unconditional — a policy cannot opt out; `killable` is a *manner-of-stopping* declaration that guards automated halts and informs, but never blocks, the operator. Replaces §9's opening and retires its UNDER-REVIEW note. Text only; the graceful-halt wiring stays deferred (docs/03). |
-| CS-023 | ADDED | §12; SIF §5 | **Batch decision semantics.** A SIF batch is decided atomically: every operation is decided first (each with its own audit record); any DENY/HALT refuses the whole batch before anything commits or stages; a HOLD stages per §4.4 and does not refuse the batch (committed `record` ops are not rolled back by a later reject/expiry). Reference implementation pending (the reference accepts single-operation intents today). |
+| CS-023 | ADDED | §12; SIF §5 | **Batch decision semantics.** A SIF batch is decided atomically: every operation is decided first (each with its own audit record); any DENY/HALT refuses the whole batch before anything commits or stages; a HOLD stages per §4.4 and does not refuse the batch (committed `record` ops are not rolled back by a later reject/expiry). Reference implementation shipped (`enforce_batch`); TCK `batch` profile certifies it. |
 | CS-024 | CLARIFIED | §7.12; registry §4 | **Classification ordering.** `disclosure.maxClassification` compares by the classification set's **declared order**; the built-in `resultSensitivity` values are ordered `public < internal < confidential < restricted`; a domain substituting its own labels MUST declare them as an ordered value set in the registry. A value missing from the declared order fails closed (§8). |
 | CS-025 | DOCS | §6.2, §6.3, §7, §13 | Editorial/clarification batch: §6.2 rule 4 reworded (gates bind by their §7 keys; all matching gates AND — allow-match specificity does not select gates); CS-018's capability home named (gateway-code connector metadata, not registry YAML); `spendLimit` unit defined as gateway configuration; approver `role:` names resolve at the identity seam (§13 rule 1 exemption); `window` absolute `from`/`to` form documented; gate-table row 13 corrected to pass/fail/hold; catalog approval examples re-keyed on stakes per the §5 note; CS-020/021 changelog status corrected to shipped. |
 

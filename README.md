@@ -12,8 +12,8 @@ are carved in Stele — and nothing else can act.**
 | Artifact | Where | Status |
 |---|---|---|
 | **SIF** — the Structured Intent Format (the five action kinds + the shape the agent emits) | `docs/00-RFC-sif-intent-format.md` | v1.0 |
-| **Stele** — the Stonefold policy language (*what's allowed*) | `docs/01-RFC-agent-control-policy.md` | v0.4 (changelog at top) |
-| Change sets (deltas between Stele revisions; a change set wins on conflict with older wording) | `docs/RFC-changeset-*.md` | v0.1→v0.4 accepted; v0.4→v0.5 draft |
+| **Stele** — the Stonefold policy language (*what's allowed*) | `docs/01-RFC-agent-control-policy.md` | v0.5 (changelog at top) |
+| Change sets (deltas between Stele revisions; a change set wins on conflict with older wording) | `docs/RFC-changeset-*.md` | v0.1→v0.5 all accepted |
 | Registry domain model (declaring resources, actions, states, scope predicates) | `docs/06-registry-domain-model.md` | |
 | Artifacts & schemas (how the three schemas relate) | `docs/07-artifacts-and-schemas.md` | |
 | Glossary (every concept in plain language) | `docs/08-glossary.md` | |

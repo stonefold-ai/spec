@@ -1,8 +1,12 @@
-# RFC Change Set — v0.4 → v0.5 (DRAFT)
+# RFC Change Set — v0.4 → v0.5 (ACCEPTED)
 
-**Status: draft — accumulating.** Items here are additions agreed for the next spec
-revision; the RFC header remains v0.4 until this set is closed. On any conflict with
-older wording, a Change Set wins (same rule as prior sets).
+**Status: ACCEPTED — merged into `docs/01` v0.5 (2026-07-04); the RFC text is normative
+and this document is the delta record. All seven items are implemented in the reference
+and certifiable by the TCK: CS-020 (`stonefold_core.digest`, TCK `digest` profile I1–I3),
+CS-021 (`stonefold_gateway.identity`), CS-023 (`enforce_batch` + the SIF wire form,
+scenarios H1–H4, TCK `batch` profile), CS-024 (the `disclosure` classification order,
+scenario C10).** On any conflict with older wording, a Change Set wins (same rule as
+prior sets).
 
 **Scope of the change.** The items in this set are **additive declarations, semantic
 completions, or text fixes** — no policy-file syntax changes, no new kinds/gates/operators
@@ -44,9 +48,10 @@ a registry change — a reviewed, versioned artifact.
 
 **Implementation impact:** gateway verifies digests at load + dispatch when declared
 (reference implementation: done — `stonefold_core.digest`, verified at policy load and at
-dispatch; the reference pins each connector's module source bytes, docs/06 §5). TCK: a
-digest profile check is future work — a certification claim MUST NOT imply digest
-verification until it exists.
+dispatch; the reference pins each connector's module source bytes, docs/06 §5). TCK: the
+`digest` profile (checks I1–I3, behind the `digest-pinning` capability) certifies the
+load-time refusal, the dispatch-time cancellation of a tampered connector (settle reason
+`connector-digest-mismatch`, normative), and the matching-pin happy path.
 
 ## CS-021 — Identity-provider seam (ADDED, architecture decision 11)
 
@@ -103,9 +108,13 @@ remain reconstructable via `correlationId`.
 **Why:** the batch/decision interaction is the first question a TCK profile for batches
 would have to answer, and both RFCs pointed at each other without answering it.
 
-**Implementation impact:** reference implementation pending — the reference gateway
-accepts single-operation intents today; these semantics are specified ahead of the
-multi-op implementation (tests/scenarios to be added with it).
+**Implementation impact:** reference implementation done — the pipeline splits into a
+decide phase (steps 1–5, nothing commits) and a commit phase; `enforce_batch` decides
+every operation first and either refuses the whole batch or commits it (the single-op
+`enforce` composes the same phases, behaviour unchanged). The SIF wire form
+(`{"operations": [...]}`) is accepted on `submit_intent`, with the SIF §6 structured
+error naming the failing operation. Scenarios H1–H4; TCK `batch` profile (behind the
+`batch` capability) certifies all four black-box.
 
 ## CS-024 — Classification ordering for `disclosure` (CLARIFIED, §7.12; registry §4)
 
@@ -120,7 +129,11 @@ makes the gate **fail closed** (the §8 runtime-resolution rule).
 gateways could disagree — fatal for a gate whose selling point is certifiability.
 
 **Implementation impact:** registry loaders treat the classification value set as
-ordered; no schema change (`valueSets` already carries ordered lists).
+ordered; no schema change (`valueSets` already carries ordered lists). Reference
+implementation done — the registry carries the declared order (built-ins by default,
+`valueSets.resultSensitivity` for domain labels) and the `disclosure` gate compares
+ranks, resolving a path-form ceiling (`actor.clearance`) and failing closed on any label
+outside the declared order. Scenario C10; certified in the TCK `core` profile.
 
 ## CS-025 — Editorial & clarification batch (DOCS, §6.2, §6.3, §7, §13)
 
