@@ -2,7 +2,7 @@
 
 The canonical home of the Stonefold specs: the intent format an agent emits, the policy
 language the gateway enforces, their JSON Schemas and worked examples, and the
-conformance test kit that certifies any implementation against them.
+specification of the conformance test kit that certifies any implementation against them.
 
 One sentence for the whole stack: **the agent speaks SIF; Stonefold enforces; the rules
 are carved in Stele — and nothing else can act.**
@@ -20,11 +20,12 @@ are carved in Stele — and nothing else can act.**
 | Interception mapping (interpreting ordinary MCP/tool calls via the declared mapping) | `docs/17-interception-mapping.md` | |
 | JSON Schemas for intents, policies, and registries | `schema/sif.schema.json`, `schema/stele.schema.json`, `schema/registry.schema.json` | |
 | Worked policies + registries (fixtures; every one validates against its schema) | `examples/`, `registry/` | |
-| **Conformance test kit (TCK)** — how ANY gateway, in any language, certifies against the RFCs | `docs/12-conformance-tck.md` + `src/stonefold_tck/` | |
+| **Conformance test kit (TCK)** — how ANY gateway, in any language, certifies against the RFCs | `docs/12-conformance-tck.md` (the runnable kit ships in the [reference repo](https://github.com/stonefold-ai/stonefold), `src/stonefold_tck/`) | |
 
-The TCK core imports nothing from any implementation; it drives a gateway either
-in-process (Python) or over the HTTP wire binding, so a Java/Go/Rust implementation
-certifies the same way the reference does.
+This repo holds documents, schemas, and fixtures only — no code. The runnable TCK lives
+in the reference repo, but its core imports nothing from the reference; it drives a
+gateway either in-process (Python) or over the HTTP wire binding, so a Java/Go/Rust
+implementation certifies the same way the reference does.
 
 ## Implementations
 
