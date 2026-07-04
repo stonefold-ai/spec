@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from acp_tck.checks import PROFILE_SCOPE, check, expect
-from acp_tck.checks._util import ALICE, BOB, expect_decision, pay, setup, submit
-from acp_tck.driver import ConformanceDriver, Operation
+from stonefold_tck.checks import PROFILE_SCOPE, check, expect
+from stonefold_tck.checks._util import ALICE, BOB, expect_decision, pay, setup, submit
+from stonefold_tck.driver import ConformanceDriver, Operation
 
 
 @check("B1", "read scope is injected below the model", PROFILE_SCOPE)

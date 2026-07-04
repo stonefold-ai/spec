@@ -5,8 +5,8 @@ Scenario ids follow ``tests/acceptance-scenarios.md``.
 
 from __future__ import annotations
 
-from acp_tck.checks import PROFILE_CORE, check, expect
-from acp_tck.checks._util import (
+from stonefold_tck.checks import PROFILE_CORE, check, expect
+from stonefold_tck.checks._util import (
     ALICE,
     email,
     expect_decision,
@@ -14,8 +14,8 @@ from acp_tck.checks._util import (
     setup,
     submit,
 )
-from acp_tck.driver import CAP_CLOCK, ConformanceDriver, Operation
-from acp_tck.fixtures import POLICY_DENY_WINS, POLICY_GATE_LAYERS, POLICY_MISSING_PATH
+from stonefold_tck.driver import CAP_CLOCK, ConformanceDriver, Operation
+from stonefold_tck.fixtures import POLICY_DENY_WINS, POLICY_GATE_LAYERS, POLICY_MISSING_PATH
 
 
 @check("A1", "default deny: unlisted and unknown actions are refused", PROFILE_CORE)

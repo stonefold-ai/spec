@@ -11,8 +11,8 @@ import traceback
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from acp_tck.checks import ALL_PROFILES, Check, ConformanceFailure, all_checks
-from acp_tck.driver import ConformanceDriver
+from stonefold_tck.checks import ALL_PROFILES, Check, ConformanceFailure, all_checks
+from stonefold_tck.driver import ConformanceDriver
 
 PASS = "pass"
 FAIL = "fail"

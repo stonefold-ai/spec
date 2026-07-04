@@ -3,8 +3,8 @@
 A gateway written in ANY language certifies by exposing the small, TEST-ONLY
 harness API below (docs/12 §6) and running::
 
-    from acp_tck import run_conformance
-    from acp_tck.http_driver import HttpDriver
+    from stonefold_tck import run_conformance
+    from stonefold_tck.http_driver import HttpDriver
     print(run_conformance(HttpDriver("http://localhost:9099")).render())
 
 The harness API is a build-time test surface — it must never ship in a
@@ -43,7 +43,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
-from acp_tck.driver import (
+from stonefold_tck.driver import (
     AuditEntry,
     LoadResult,
     Operation,

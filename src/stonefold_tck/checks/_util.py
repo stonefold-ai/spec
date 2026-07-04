@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from acp_tck.checks import ConformanceFailure, expect
-from acp_tck.driver import CAP_CLOCK, ConformanceDriver, Operation, SubmitResult, TckActor
-from acp_tck.fixtures import TCK_POLICY, TCK_REGISTRY
+from stonefold_tck.checks import ConformanceFailure, expect
+from stonefold_tck.driver import CAP_CLOCK, ConformanceDriver, Operation, SubmitResult, TckActor
+from stonefold_tck.fixtures import TCK_POLICY, TCK_REGISTRY
 
 T0 = datetime(2026, 7, 2, 12, 0, 0, tzinfo=timezone.utc)
 

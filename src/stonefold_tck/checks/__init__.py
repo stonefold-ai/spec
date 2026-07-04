@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from acp_tck.driver import ConformanceDriver
+from stonefold_tck.driver import ConformanceDriver
 
 # conformance profiles (docs/12 §4)
 PROFILE_CORE = "core"  # authorization + deterministic gates
@@ -69,6 +69,6 @@ def check(
 
 def all_checks() -> tuple[Check, ...]:
     # import for side effects: each module registers its checks
-    from acp_tck.checks import audit, core, freshness, kill, lint, scope, staging  # noqa: F401
+    from stonefold_tck.checks import audit, core, freshness, kill, lint, scope, staging  # noqa: F401
 
     return tuple(_CHECKS)

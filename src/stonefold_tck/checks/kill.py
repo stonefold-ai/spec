@@ -13,9 +13,9 @@ Postgres row locks).
 
 from __future__ import annotations
 
-from acp_tck.checks import PROFILE_KILL, check, expect
-from acp_tck.checks._util import SESSION, expect_decision, expect_ticket, pay, setup, submit
-from acp_tck.driver import CAP_KILL, CAP_STAGING, ConformanceDriver
+from stonefold_tck.checks import PROFILE_KILL, check, expect
+from stonefold_tck.checks._util import SESSION, expect_decision, expect_ticket, pay, setup, submit
+from stonefold_tck.driver import CAP_KILL, CAP_STAGING, ConformanceDriver
 
 
 def _pay_effects(driver: ConformanceDriver) -> int:
@@ -60,7 +60,7 @@ def e6_action_class_kill(driver: ConformanceDriver) -> None:
     setup(driver)
     driver.kill(scope="action_class", action="pay")
     expect_decision(submit(driver, pay(500)), "halt", "the killed action class")
-    from acp_tck.checks._util import email
+    from stonefold_tck.checks._util import email
 
     r = submit(driver, email())
     expect(r.decision in ("allow", "hold"), f"other actions are unaffected (got {r.decision})")

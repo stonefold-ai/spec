@@ -10,9 +10,9 @@ test (the reference keeps one over real Postgres).
 
 from __future__ import annotations
 
-from acp_tck.checks import PROFILE_AUDIT, check, expect
-from acp_tck.checks._util import SESSION, expect_decision, pay, setup, submit
-from acp_tck.driver import CAP_AUDIT, CAP_KILL, CAP_STAGING, ConformanceDriver
+from stonefold_tck.checks import PROFILE_AUDIT, check, expect
+from stonefold_tck.checks._util import SESSION, expect_decision, pay, setup, submit
+from stonefold_tck.driver import CAP_AUDIT, CAP_KILL, CAP_STAGING, ConformanceDriver
 
 
 @check("F1", "every decision — allow, hold, deny, halt — leaves an audit record", PROFILE_AUDIT,

@@ -7,9 +7,9 @@ permissive default. Warnings (A7-style) require the driver to surface them
 
 from __future__ import annotations
 
-from acp_tck.checks import PROFILE_LINT, check, expect
-from acp_tck.driver import CAP_LINT_WARNINGS, ConformanceDriver
-from acp_tck.fixtures import (
+from stonefold_tck.checks import PROFILE_LINT, check, expect
+from stonefold_tck.driver import CAP_LINT_WARNINGS, ConformanceDriver
+from stonefold_tck.fixtures import (
     POLICY_INVALID_DUAL_QUORUM,
     POLICY_INVALID_OPEN_IRREVERSIBLE,
     POLICY_INVALID_STANDING_DENY,

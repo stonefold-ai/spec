@@ -1,5 +1,5 @@
 """A FastAPI harness exposing any ``ConformanceDriver`` over the TCK wire
-protocol (``acp_tck.http_driver``).
+protocol (``stonefold_tck.http_driver``).
 
 Two uses: (1) it serves the reference implementation to remote TCK runs, and
 (2) it is the golden example of the harness API a non-Python gateway must
@@ -14,7 +14,7 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from acp_tck.driver import ConformanceDriver, Operation, TckActor
+from stonefold_tck.driver import ConformanceDriver, Operation, TckActor
 
 
 def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> FastAPI:

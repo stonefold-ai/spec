@@ -18,7 +18,7 @@ from typing import Any
 
 import yaml
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     FreshnessConfig,
     InMemoryAuditSink,
@@ -28,19 +28,19 @@ from acp_core import (
     load_policy,
     load_registry,
 )
-from acp_core.connector import Connectors, ConnectorResult
-from acp_core.kill import KillScope, KillScopeKind
-from acp_core.linter import PolicyError
-from acp_core.models import RawCall, ResolvedAction
-from acp_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
-from acp_gates.base import GateContext
-from acp_gates.content import ContentHookRegistry
-from acp_gates.engine import DefaultGateEngine, make_dispatch_revalidator
-from acp_gateway.transport import Gateway
-from acp_connectors import InMemoryConnector
-from acp_store import DispatchWorker, InMemoryOutboxStore
-from acp_store.kill_memory import InMemoryKillStore
-from acp_tck.driver import (
+from stonefold_core.connector import Connectors, ConnectorResult
+from stonefold_core.kill import KillScope, KillScopeKind
+from stonefold_core.linter import PolicyError
+from stonefold_core.models import RawCall, ResolvedAction
+from stonefold_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
+from stonefold_gates.base import GateContext
+from stonefold_gates.content import ContentHookRegistry
+from stonefold_gates.engine import DefaultGateEngine, make_dispatch_revalidator
+from stonefold_gateway.transport import Gateway
+from stonefold_connectors import InMemoryConnector
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_store.kill_memory import InMemoryKillStore
+from stonefold_tck.driver import (
     ALL_CAPABILITIES,
     AuditEntry,
     LoadResult,
@@ -49,9 +49,9 @@ from acp_tck.driver import (
     TckActor,
 )
 
-_SCHEMA = Path(__file__).resolve().parents[3] / "schema" / "acp.schema.json"
+_SCHEMA = Path(__file__).resolve().parents[3] / "schema" / "stele.schema.json"
 
-# The REQUIRED TCK freshness config (acp_tck.driver, CAP_FRESHNESS): the D5/D6
+# The REQUIRED TCK freshness config (stonefold_tck.driver, CAP_FRESHNESS): the D5/D6
 # checks pick their clock advances against exactly these TTLs.
 _TCK_FRESHNESS = FreshnessConfig(
     default_ttl=timedelta(hours=24), irreversible_ttl=timedelta(minutes=30)

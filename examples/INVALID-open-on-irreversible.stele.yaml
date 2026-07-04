@@ -4,7 +4,7 @@
 #   - '*' grant -> WARN (§13.6)
 #   - irreversible effect 'wipeDisk' with no approval/precondition (§13.4) -> WARN
 # Use this fixture to prove the validator fails closed and reports each issue.
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: bad-agent
 defaults: { failureMode: open, audit: basic }
 killable: false

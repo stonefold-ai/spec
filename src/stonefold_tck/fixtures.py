@@ -121,7 +121,7 @@ entities:
 
 # The base policy most checks run against — exercises every gate family.
 TCK_POLICY = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-agent
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -165,7 +165,7 @@ gates:
 # --- per-check policy variants -------------------------------------------
 # A2: an explicit deny beats a matching allow.
 POLICY_DENY_WINS = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-agent
 defaults: { failureMode: closed, audit: full }
 allow:
@@ -178,7 +178,7 @@ deny:
 # "dual.example" passes the action-level allowlist but hits the kind-level
 # denylist, so a deny proves the kind-level gate also ran.
 POLICY_GATE_LAYERS = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-agent
 defaults: { failureMode: closed, audit: full }
 allow:
@@ -192,7 +192,7 @@ gates:
 
 # C8: a condition referencing a path absent at runtime fails CLOSED.
 POLICY_MISSING_PATH = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-agent
 defaults: { failureMode: closed, audit: full }
 allow:
@@ -204,7 +204,7 @@ gates:
 
 # Lint fixtures — each MUST refuse to load (ERROR) or report (WARN).
 POLICY_INVALID_OPEN_IRREVERSIBLE = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-bad-agent
 defaults: { failureMode: open, audit: basic }
 allow:
@@ -212,7 +212,7 @@ allow:
 """
 
 POLICY_INVALID_UNKNOWN_NAME = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-bad-agent
 allow:
   - effect: [pay]
@@ -221,7 +221,7 @@ deny:
 """
 
 POLICY_INVALID_STANDING_DENY = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-bad-agent
 allow:
   - observe: [Widget]
@@ -234,7 +234,7 @@ standing:
 """
 
 POLICY_INVALID_DUAL_QUORUM = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-bad-agent
 allow:
   - effect: [pay]
@@ -244,7 +244,7 @@ gates:
 """
 
 POLICY_WARN_STAR_GRANT = """\
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: tck-warn-agent
 defaults: { failureMode: closed, audit: full }
 allow:

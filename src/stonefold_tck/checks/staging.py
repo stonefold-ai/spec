@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from acp_tck.checks import PROFILE_STAGING, check, expect
-from acp_tck.checks._util import expect_decision, expect_ticket, pay, setup, submit
-from acp_tck.driver import (
+from stonefold_tck.checks import PROFILE_STAGING, check, expect
+from stonefold_tck.checks._util import expect_decision, expect_ticket, pay, setup, submit
+from stonefold_tck.driver import (
     CAP_APPROVALS,
     CAP_DISPATCH_FAILURE,
     CAP_STAGING,

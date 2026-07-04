@@ -2,7 +2,7 @@
 
 A driver claiming ``CAP_FRESHNESS`` MUST run with the REQUIRED TCK freshness
 config: default decision TTL **24 hours**, irreversible TTL **30 minutes**
-(``acp_tck.driver``). The v0.4 settle reasons asserted here — ``stale-decision``,
+(``stonefold_tck.driver``). The v0.4 settle reasons asserted here — ``stale-decision``,
 ``stale-guard:<gate>``, ``scope-lost`` — are normative (RFC §12/§6.3), so the
 checks compare them exactly.
 
@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from acp_tck.checks import PROFILE_FRESHNESS, check, expect
-from acp_tck.checks._util import T0, expect_decision, expect_ticket, pay, setup, submit
-from acp_tck.driver import (
+from stonefold_tck.checks import PROFILE_FRESHNESS, check, expect
+from stonefold_tck.checks._util import T0, expect_decision, expect_ticket, pay, setup, submit
+from stonefold_tck.driver import (
     CAP_APPROVALS,
     CAP_AUDIT,
     CAP_CLOCK,

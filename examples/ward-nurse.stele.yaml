@@ -1,4 +1,4 @@
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: ward-nurse-assistant
 defaults: { failureMode: closed, audit: full }
 killable: true
