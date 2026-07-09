@@ -2,7 +2,9 @@
 
 *The registry is where a domain is **declared**: its entities, their properties, the actions you can take on them (each with a **kind** and governance **attributes**), lifecycle states, value sets, and the connectors/predicates the gateway uses. SIF draws the agent's vocabulary from it; Stele reads attributes from it; the gateway validates every intent against it.*
 
-**Status:** Draft v1.1. **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); Stele ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
+**Status:** Draft v1.2 (alongside Stele's OPEN v0.5 → v0.6 change set). **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); Stele ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
+
+> **Changelog v1.1 → v1.2** (alongside Stele v0.6, `RFC-changeset-v0.5-to-v0.6.md`): **obligation registries** added — a new declaration class backing the `requireMatch` gate (Stele §7.16), with a typed schema, CS-020 digest pinning, a declared consistency capability, and the four-operation adapter contract (§5b, Stele CS-034); **precondition-check declarations gain an object form** — `name` + `holdCapable` + `reasonCodes` with retry classes (§5, Stele CS-026/CS-029; the bare-name form stays valid); the registered-functions reference updated for the three-valued check result (§6).
 
 > **Changelog v1.0 → v1.1** (spec-review fixes, alongside Stele v0.3): attribute **defaults corrected** — undeclared attributes default to the *benign* end (`reversibility: reversible`), not the dangerous end as v1.0 stated (§4); `compensation` added to the action shape and to `schema/registry.schema.json` (§4); **action-name uniqueness** guidance and its lint consequence added (§8); scope-predicate **argument forms** defined (§5); the `derived` expression boundary made explicit (§4); the v1.0 "**exception for `deny`**" (undeclared names allowed in `deny`) **removed** — Stele §13.1 applies to `deny` too (Stele CS-016; the linter already enforced this).
 
@@ -25,18 +27,19 @@ Think of it as the typed schema of your world: like a database schema or a set o
 apiVersion: registry/v1.0
 domain: payments
 
-connectors:        { … }   # named effect bindings / data sources
-scopePredicates:   [ … ]   # names the gateway implements (e.g. tenantOf)
-preconditionChecks:[ … ]   # named deterministic checks (e.g. payeeCoolingOffElapsed)
-handlers:          [ … ]   # named post-action / effect handlers (e.g. recordLedgerEntry)
-hooks:             [ … ]   # named content hooks (e.g. dlp.basic)
-sinks:             [ … ]   # named disclosure sinks (e.g. careTeam)
-namedSets:         { … }   # allow/deny lists (e.g. sanctioned-list)
-valueSets:         { … }   # reusable enums
-entities:          { … }   # the domain itself
+connectors:          { … }   # named effect bindings / data sources
+scopePredicates:     [ … ]   # names the gateway implements (e.g. tenantOf)
+preconditionChecks:  [ … ]   # named deterministic checks (e.g. payeeCoolingOffElapsed)
+handlers:            [ … ]   # named post-action / effect handlers (e.g. recordLedgerEntry)
+hooks:               [ … ]   # named content hooks (e.g. dlp.basic)
+sinks:               [ … ]   # named disclosure sinks (e.g. careTeam)
+namedSets:           { … }   # allow/deny lists (e.g. sanctioned-list)
+valueSets:           { … }   # reusable enums
+obligationRegistries:{ … }   # v1.2: systems of record requireMatch matches against (§5b)
+entities:            { … }   # the domain itself
 ```
 
-`connectors`, `scopePredicates`, `preconditionChecks`, `handlers`, `hooks`, `sinks` are **declarations of names the integrator implements in code** — listing them here lets the linter verify policies and tells implementers exactly what to build (the `[REGISTER]` items from `examples/README.md`).
+`connectors`, `scopePredicates`, `preconditionChecks`, `handlers`, `hooks`, `sinks`, and `obligationRegistries` are **declarations of names the integrator implements in code** — listing them here lets the linter verify policies and tells implementers exactly what to build (the `[REGISTER]` items from `examples/README.md`).
 
 ---
 
@@ -114,7 +117,14 @@ connectors:
     type: method                            # the effect binding for `pay`
     digest: "sha256:9f2b…"                  # OPTIONAL: pins the implementing artifact
 scopePredicates:   [ tenantOf ]             # implemented in the gateway
-preconditionChecks:[ payeeCoolingOffElapsed ]  # named checks (pass/fail)
+preconditionChecks:                         # named checks — bare or object form (v1.2)
+  - payeeCoolingOffElapsed                  # bare: two-valued, codes default terminal
+  - name: matchesOpenCase                   # object: declares hold capability + codes
+    holdCapable: true
+    reasonCodes:
+      no-open-case:        terminal
+      case-already-linked: retryable
+      multiple-candidates: escalate         # hold-shaped: returned with the hold
 handlers:          [ recordLedgerEntry ]       # named post-action handlers
 hooks:             [ dlp.basic ]               # named content hooks
 sinks:             [ ]                          # named disclosure sinks
@@ -124,9 +134,54 @@ namedSets:
 
 These names are exactly what a policy or an action references (`scope: { Payment: tenantOf(actor) }`, `denylist: { set: sanctioned-list }`, `precondition: [payeeCoolingOffElapsed]`, `postActions: [recordLedgerEntry]`). The registry declares them so they can be validated and so implementers have a checklist. Each is a function the integrator implements (see §6).
 
+**Precondition-check object form (v1.2 — Stele CS-026/CS-029).** A check declared as a bare name is two-valued (pass/fail) and any reason codes it emits default to retry class `terminal`. The object form declares more: `holdCapable: true` permits the check to resolve `hold` (Stele §7.6 — without this declaration a hold from the check is an implementation error), and `reasonCodes` maps each code the check may emit to its retry class (`retryable` | `terminal` | `escalate`, Stele §11). The linter refuses `holdCapable: true` with no declared `reasonCodes` (Stele §13 rule 18): a hold without a code is uninformative, and the declaration is what makes the codes checkable.
+
 **Scope-reassertion capability (CS-018).** Besides its registry declaration, each connector declares its scope-reassertion capability — `transactional` or `window` (Stele §6.3) — **in gateway code, alongside the connector implementation**, the same way scope-predicate bindings are registered. It is deliberately *not* a registry-YAML field: the capability is a property of the connector's code and is reviewed with that code. An implementation that declares nothing is treated as `window:undeclared` — fail-safe, and labelled honestly in the audit record.
 
 **Digest pinning (`digest`, optional).** A connector MAY pin the artifact that implements it by content digest (`sha256:…` over the connector's code artifact, as built/deployed). When a digest is declared, the gateway MUST verify the loaded implementation against it **at policy load and at dispatch**; a mismatch is a dependency failure under the policy's `failureMode` rules (Stele §10) — fail closed by default, with an audit record. The point: the registry already declares *what* a connector does; the digest declares *which code* is trusted to do it, so silently replacing a connector's implementation stops being invisible — changing connector code requires a registry change, which is a reviewed, versioned artifact. Production deployments handling irreversible effects SHOULD pin their effect connectors. How the digest is computed and artifacts are signed is deployment tooling, not registry semantics — the registry only carries the declaration. (Trust boundary discussion: docs/13.)
+
+---
+
+## 5b. Obligation registries (v1.2 — Stele CS-034)
+
+An **obligation registry** declares a system of record the `requireMatch` gate (Stele §7.16) matches intents against: open purchase orders, active prescriptions, open support cases. Stonefold never stores, owns, or edits obligations — the declaration names the source, types its fields, and states its consistency guarantee; the gateway matches against it and consumes from it (Stele §12, CS-035).
+
+```yaml
+obligationRegistries:
+  erp.purchase_orders:
+    connector: erp-po-adapter               # the adapter implementing the four operations below
+    digest: "sha256:…"                      # OPTIONAL — CS-020 pinning applies unchanged
+    capability: transactional               # transactional | window (see below)
+    schema:                                 # typed; free-text fields are never match inputs
+      vendorId: { type: string }
+      state:    { values: [open, closed, cancelled] }
+      vendor:
+        type: object
+        properties:
+          domain: { type: string }
+      line:
+        type: object
+        properties:
+          amount: { type: decimal }
+          state:  { values: [unconsumed, reserved, consumed] }
+```
+
+- **`connector`** — MUST name a declared connector (§5) whose implementation satisfies the adapter contract below.
+- **`schema`** — the typed shape of one obligation record, **as seen by the match**. Declare only the fields your policies compare and consume — this is a match surface, not a domain model: a purchase order may carry a hundred fields; the registry names the five the policy reads. Every `obligation.*` path a policy's `match`/`provenance`/`consume` references MUST exist here (Stele §13 rule 14); property shapes reuse §3's forms (`type`, `values`, nested `properties`). Only typed fields participate in matching — free text is never a match input. (And if even this is more declaration than the deployment wants, the plain-precondition path needs none of it — Stele §7.16, adoption path.)
+- **`capability`** — how `consume` composes with the effect's settlement, mirroring the CS-018 scope-reassertion capabilities: **`transactional`** — the adapter can consume inside the same transaction as the effect's commit and the audit write (no consumed-without-effect, no effect-without-consumed); **`window`** — it cannot; consumption runs immediately after connector confirmation and the adapter's declared residual window is surfaced in the audit record (priced, not hidden). Unlike CS-018's connector capability, this one is registry YAML: which guarantee a system of record offers is a reviewable fact about the domain, not about gateway code.
+
+**The adapter contract.** The connector behind an obligation registry implements four operations (gateway-code contract, like every §6 registered function — the signatures below are illustrative):
+
+```
+query(selector)                  -> [Obligation]        # typed records matching the selector
+reserve(ref, intent_id)          -> Reserved | AlreadyReserved | AlreadyConsumed
+consume(ref, intent_id)          -> ConsumeReceipt | AlreadyConsumed
+release(ref, intent_id)          -> Released | NotHeld
+```
+
+All four MUST be **idempotent per (obligation ref, intent id)** — a retry never double-reserves or double-consumes, and releasing an already-expired reservation is a no-op (`NotHeld`). Reservations carry a **TTL agreed with the gateway, at least the staged row's decision TTL**, and the adapter MUST expire orphaned reservations (a gateway crash between reserve and staging-commit must not lock a real order line forever) — the lifecycle rules are Stele §12, CS-035.
+
+**Trust and separation.** An obligation registry is part of the trusted computing base (Stele §1, CS-019 wording applies); digest pinning and deployment discipline are its integrity story. **The governed agent's principal MUST NOT hold write access to any registry its policy matches against** — an agent that can create orders and then pay against them approves itself. This is enforced at deployment; the linter errors where the overlap is statically visible (the policy grants writes on the resource backing the registry) and otherwise emits an info pointing at this deployment check (Stele §13 rule 15). The flip side is out of scope by design: whether the *obligation itself* is legitimate (a fake order, a wrong prescription) is guarded where obligations are created — approvals, separation of duties — which was true before agents and stays true (Stele §1 non-goals).
 
 ---
 
@@ -139,7 +194,7 @@ A common question: do `preconditions` / `postActions` generate code skeletons, o
 You write the declaration; the gateway enforces it. No handler exists.
 
 **Bucket B — named functions you implement; the framework invokes them.** The framework guarantees **when** they run and treats their result deterministically, but the **body is your code**:
-- **precondition checks** (`payeeCoolingOffElapsed`, `fiveRightsVerified`) — run before execution; any failure ⇒ DENY,
+- **precondition checks** (`payeeCoolingOffElapsed`, `fiveRightsVerified`) — run before execution; any failure ⇒ DENY (a check declared `holdCapable` may instead resolve `hold` for judgment-shaped ambiguity — Stele §7.6),
 - **content hooks** (`dlp.basic`) — return pass/block,
 - **scope predicates** (`tenantOf`) — return a filter / authorization decision,
 - **post-actions / effect handlers** — the `connector` and any `postActions` — run after the action passes all gates; they perform the effect and may set derived fields.
@@ -150,7 +205,7 @@ So: **invocation and ordering are automatic; the logic is hand-written.** The fr
 
 | Kind | Signature (illustrative) | Must be |
 |---|---|---|
-| precondition check | `bool check(Context ctx)` → pass/fail (+reason) | pure / deterministic, no side effects |
+| precondition check | `Result check(Context ctx)` → pass / fail / hold (+reason code, Stele §7.6/§11; a plain boolean remains a valid two-valued form) | pure / deterministic, no side effects |
 | content hook | `Verdict hook(Content c)` → pass/block | deterministic verdict |
 | scope predicate | `Filter\|Authz scope(Actor a)` | deterministic |
 | post-action / effect handler | `Result handle(ResolvedAction a, Context ctx)` | may call external systems; runs after gates, in the staged dispatch |
@@ -173,9 +228,9 @@ The five kinds of named function the registry can declare. Each: what it is · w
 - *Argument form:* predicates are declared and resolved by **bare name**; the parenthesised argument a policy writes (`tenantOf(actor)`, `inWard(actor.ward)`) selects the actor claim the predicate reads and MUST be `actor` or a dotted `actor.<claim>` path — never a free expression. The gateway supplies the actor itself; the argument is validated against the predicate's declared signature at load.
 
 **Precondition check** — declared in `preconditionChecks`; referenced by an action's `preconditions` or a Stele `precondition` gate.
-- *What:* a deterministic yes/no test that must hold before an action runs.
-- *Receives → returns:* the resolved action + target + data + actor (a context) → **pass / fail(reason)**.
-- *When:* the gate step, before execution; any fail ⇒ DENY.
+- *What:* a deterministic test that must hold before an action runs.
+- *Receives → returns:* the resolved action + target + data + actor (a context) → **pass / fail(reason code) / hold(reason code)** — `hold` only when declared `holdCapable` (§5), and only for successfully-read, judgment-shaped ambiguity; a source outage or a crash is `fail`/dependency-failure, never `hold` (Stele §7.6).
+- *When:* the gate step, before execution; any fail ⇒ DENY; a hold suspends for the declared resolver (Stele §12).
 - *Example:* `payeeCoolingOffElapsed(ctx)` → false when the payee was created < 24h ago. Must be pure/deterministic, no side effects.
 
 **Content hook** — declared in `hooks`; referenced by a Stele `contentCheck` gate.
@@ -221,7 +276,7 @@ One name, three concerns: *defined* in the registry, *expressed* via SIF, *gover
 ---
 
 ## 8. Validation
-A registry MUST pass `schema/registry.schema.json` (structure) plus these checks: every `type`/`entity` reference resolves; every `transition` has `from`/`to` within the entity's declared states; every `connector`/`scopePredicate`/`preconditionCheck`/`hook`/`sink`/`namedSet` referenced by an action or by a companion policy is declared; every declared `compensation` names a resource+action that exists (Stele §13 rule 10); action `kind`s are valid; attribute values are in their allowed sets (SIF §2 / Stele §5).
+A registry MUST pass `schema/registry.schema.json` (structure) plus these checks: every `type`/`entity` reference resolves; every `transition` has `from`/`to` within the entity's declared states; every `connector`/`scopePredicate`/`preconditionCheck`/`hook`/`sink`/`namedSet`/`obligationRegistry` referenced by an action or by a companion policy is declared; every declared `compensation` names a resource+action that exists (Stele §13 rule 10); action `kind`s are valid; attribute values are in their allowed sets (SIF §2 / Stele §5). For v1.2 declarations additionally: every obligation registry's `connector` is declared and its `capability` is `transactional` or `window`; every `obligation.*` path a companion policy's `requireMatch` references exists in the registry's declared `schema`, and tolerance clauses land on numeric/money fields (Stele §13 rule 14); a precondition check declared `holdCapable: true` declares its `reasonCodes` (Stele §13 rule 18).
 
 **Action-name uniqueness.** Action names SHOULD be unique per kind across the registry. A name declared by more than one resource (e.g. an `effect` called `exportData` on two entities) makes a policy's bare-name grant apply everywhere the name is declared — which is what a bare-name `deny` wants, but makes a bare-name `allow` ambiguous (Stele §6.1 / lint rule 12); policies over such a registry should use the `{ Entity: [names] }` map form.
 

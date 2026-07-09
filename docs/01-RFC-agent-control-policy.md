@@ -1,13 +1,32 @@
-# Stele — Specification v0.5
+# Stele — Specification v0.6 (draft)
 
 *The policy language for the SIF gateway: the declarative file that decides, deterministically, what an AI agent is permitted to do, and what is recorded when it tries.*
 
-> **Layering.** Stele is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). Stele references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; Stele = *what is allowed*.
+> **Layering.** Stele is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). Stele references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; Stele = *what is allowed*; the v0.6 `requireMatch` gate adds the third clause — *what is owed* (§7.16).
 
-**Status:** Draft v0.5 (reference specification; supersedes v0.4). **Authors:** the agent-platform team.
+**Status:** Draft v0.6 — change set v0.5 → v0.6 **OPEN** ([`docs/RFC-changeset-v0.5-to-v0.6.md`](RFC-changeset-v0.5-to-v0.6.md)); its items (CS-026…CS-039) are mirrored below and are normative for implementers of this draft; the version closes to v0.6 when the set is accepted (reference implemented, TCK profiles certified). The last **closed** version is v0.5. **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.5 is **additive declarations, semantic completions, and text fixes** — no policy-file syntax changed, no new kinds/gates/operators (the frozen shape holds); `schema/stele.schema.json` is unchanged and existing `apiVersion: stele/v0.1` policy files remain valid as-is. CS-020 adds an optional registry declaration (connector `digest` pins); CS-023 specifies batch decision semantics (gateway behaviour); CS-024 pins the classification order `disclosure` compares by. Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`; v0.4 → v0.5 is `docs/RFC-changeset-v0.4-to-v0.5.md`.
+> **Compatibility:** v0.6 is **additive**: no existing key changes meaning, and existing `apiVersion: stele/v0.1` policy files remain valid as-is. It contains **one deliberate, argued amendment to the frozen shape** — the gate catalog grows from fourteen to fifteen (`requireMatch`, CS-032) — and deliberately does **not** touch the condition grammar (§8): the tolerance comparison is a structured gate field (CS-033), not a new operator. `schema/stele.schema.json` gains optional keys only. Three behavioural deltas an upgrading deployment sees (all intended): the agent-facing feedback default becomes `code+fields` (CS-030), held rows expire actively (CS-028), and duplicate holds collapse (CS-031). v0.5 was additive declarations, semantic completions, and text fixes (digest pins CS-020, batch semantics CS-023, classification order CS-024). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`; v0.4 → v0.5 is `docs/RFC-changeset-v0.4-to-v0.5.md`; v0.5 → v0.6 is `docs/RFC-changeset-v0.5-to-v0.6.md` (OPEN).
+
+## Changelog — v0.5 → v0.6 (OPEN)
+
+| ID | Type | §  | Summary |
+|----|------|----|---------|
+| CS-026 | ADDED | §7.6, §12 | **Preconditions may resolve `hold`.** A named check resolves pass / fail / hold; hold reuses the held lifecycle (no new state). Outages/crashes MUST fail, never hold — hold is only for successfully-read, judgment-shaped ambiguity; a hold without a machine-readable reason code is a check implementation error (resolves fail, logged). Opt-in per check (declared `holdCapable`, registry §5); two-valued checks stay valid. |
+| CS-027 | ADDED | §12, §4.4 | **Multi-hold release.** A held row carries the release contract of **every** holding gate; promotion requires each satisfied. Non-approval holds name a `resolvers:` role (identity seam) or fall back to the deployment's default resolver role; a hold with no resolvable contract is refused fail-closed (`hold-unresolvable`), never staged open. Also binds composed approval gates (approval + dual-auth holding together each bind). |
+| CS-028 | ADDED | §7.8, §12 | **Held-row expiry enforced.** A held row expires at the earlier of the holding gate's `timeout` and the staging TTL (CS-017), via an active sweep: settles `CANCELLED`/`expired-hold:<gate>` (normative reason), original hold reason code preserved. `onTimeout: allow` satisfies its own contract only. Retires the previously-unenforced `timeout`/`onTimeout` declarations. |
+| CS-029 | ADDED | §7, §11 | **Reason codes carry a retry class** — `retryable` \| `terminal` \| `escalate` — returned to the agent with every deny/hold. Undeclared class defaults `terminal`. Registry precondition declarations gain an object form (`name`, `holdCapable`, `reasonCodes`); built-in gate reasons get normative classes (§11). |
+| CS-030 | ADDED | §11 | **Agent feedback visibility.** Per gate/check: `code` \| `code+fields` (default) \| `code+evidence` governs what the agent receives on deny/hold; the audit record always carries everything (redact on return, never on write). Deny-rate + reason-code distribution per principal SHOULD be surfaced (probing detection). |
+| CS-031 | ADDED | §12 | **Hold dedupe.** Same (agent, action, reason code, candidate refs) within the deployment's dedupe window collapses into one held row with an attempt count; every attempt still audited. Per-principal open-hold budget deferred to v0.6.1. |
+| CS-032 | ADDED | §7.16 | **`requireMatch` gate** (gate 15 — the argued frozen-shape amendment). An intent MUST correspond to exactly one open obligation in a declared obligation registry, within declared tolerance; reserved at staging, consumed at settlement. Three-valued: match / no-match / ambiguous; ambiguous never auto-resolves (`onAmbiguous: allow` is illegal). |
+| CS-033 | ADDED | §7.16 | **Tolerance clauses are structured fields**, legal only inside `requireMatch.match` (`{ field, matches, within }`); the §8 condition grammar is unchanged. |
+| CS-034 | ADDED | registry (docs/06 §5b) | **Obligation registries.** A named, typed, digest-pinnable (CS-020) declaration class; adapter contract `query`/`reserve`/`consume`/`release`, idempotent per (ref, intent id); declared consistency capability `transactional` \| `window` (CS-018 semantics). TCB member; the governed agent MUST NOT hold write access to a registry it matches against. |
+| CS-035 | ADDED | §12 | **Reservation lifecycle.** Reserve inside the staging commit; liveness-check inside the dispatch claim; consume with the settle (transactional: same transaction as effect + CS-006 audit write; window: post-confirm, residual surfaced); release on any terminal non-success. Reservations carry their own TTL ≥ the row's decision TTL (orphan recovery); batch reservations are all-or-nothing (CS-023). |
+| CS-036 | ADDED | §7.16, §12 | **Agent-independent read path.** `obligation.*` operands resolve from the registry's response only; an intent MAY carry an obligation pointer, which narrows the query but never substitutes for it. |
+| CS-037 | ADDED | §11 | **Audit extension.** `obligationRefs` (entitlement-side lineage, complementing `resultRefs`) and `consumption` (`reserved` \| `consumed` \| `released` + receipt id, + residual for window registries). |
+| CS-038 | ADDED | §13 | **Linter rules 14–18** (registry/path/tolerance typing; creation/execution separation; `consume: none` on irreversible ⇒ warn; `onAmbiguous: allow` ⇒ error; hold-capability declarations). Rule 4 amended: `requireMatch` counts as a satisfying guard. |
+| CS-039 | DOCS | §14, §1 | Worked examples: §14.4 `pay` matches and consumes a purchase-order line; §14.2 `administer` matches a prescription schedule slot. Non-goals block added to §1 (not a system of record; entitlement ≠ judgment; the human is the registry where none can exist). |
 
 ## Changelog — v0.4 → v0.5
 
@@ -76,6 +95,8 @@ Five principles constrain the whole format. They are the reason the language sta
 
 **Trust boundary.** The gateway proves that *intents conform to policy*; it does not prove that the code executing them does what it declares. Connectors, registered hooks, and the gateway itself are the trusted computing base: their integrity is a supply-chain property, mitigated by declaration (connector digest pinning, registry §5 of docs/06; a mismatch is a dependency failure under §10) and by deployment discipline — it is not established by this policy language. The non-normative discussion is in docs/13.
 
+**What v0.6 does not claim (non-goals, CS-039).** Stonefold is not a system of record: it persists match decisions and consumption receipts in the audit log, never obligations. `requireMatch` (§7.16) verifies **entitlement, not judgment** — it establishes that an intent corresponds to a registered obligation within tolerance; it cannot establish that the obligation itself is legitimate. A fraudulent purchase order or an erroneous prescription passes. That risk lives **upstream, at obligation creation**, where existing organisational controls (separation of duties, approval workflows, prescriber/pharmacist verification) already sit — and §13 rule 15 exists precisely so the governed agent cannot become its own upstream. Where no obligation registry can exist (the §14.3 engagement decision has no automatable ground truth), **the human is the registry**: `requireApproval`/`dualAuthorization` remain the honest floor; `requireMatch` does not replace them, and policies SHOULD say so.
+
 ---
 
 ## 2. Core concepts
@@ -89,7 +110,7 @@ Five principles constrain the whole format. They are the reason the language sta
 | **Kind** | One of five fixed categories every action belongs to (§4). |
 | **Governance attributes** | Fixed, declared facts about an action that policies reason over: reversibility, emission, operative force, result sensitivity, explainability (§5). |
 | **Gate** | A deterministic condition an attempted action must pass (§7). |
-| **Decision** | The gateway's verdict: `allow`, `hold` (await approval), `deny`, or `halt`. |
+| **Decision** | The gateway's verdict: `allow`, `hold` (held for human release, §12), `deny`, or `halt`. |
 
 ---
 
@@ -231,7 +252,7 @@ This is not dispatch-time re-authorization: `allow`/`deny` and the scope *decisi
 
 ## 7. Gate catalog — full enumeration
 
-Gates attach under `gates`, keyed by a **named action** (bare — `sendEmail` — or resource-qualified — `Order.confirm`), a **kind**, or `'*'` (all actions). All gates that match an action are combined with **AND** — every one MUST pass. Each gate resolves to `pass`, `fail` (⇒ DENY), or `hold` (⇒ await approval). Any gate value MAY be made conditional with `when:` (§8).
+Gates attach under `gates`, keyed by a **named action** (bare — `sendEmail` — or resource-qualified — `Order.confirm`), a **kind**, or `'*'` (all actions). All gates that match an action are combined with **AND** — every one MUST pass. Each gate resolves to `pass`, `fail` (⇒ DENY), or `hold` (⇒ held for human release under the holding gate's contract, §12). Any gate value MAY be made conditional with `when:` (§8).
 
 ```yaml
 gates:
@@ -243,7 +264,7 @@ gates:
     requireApproval: { when: "action.operativeForce == high" }   # key on stakes, not reversibility (§5 note)
 ```
 
-The complete gate set (unchanged in v0.2):
+The complete gate set (rows 1–14 unchanged since v0.1; row 15 is v0.6's one argued amendment to the frozen shape, CS-032; row 6 gained `hold` in v0.6, CS-026):
 
 | # | Gate | Resolves | Purpose |
 |---|---|---|---|
@@ -252,7 +273,7 @@ The complete gate set (unchanged in v0.2):
 | 3 | `valueLimit` | pass/fail | Numeric bound on a parameter/field. |
 | 4 | `spendLimit` | pass/fail | Cost/$ ceiling per task/session. |
 | 5 | `allowlist` / `denylist` | pass/fail | Membership constraint on a field. |
-| 6 | `precondition` | pass/fail | Named deterministic check / lifecycle from-states. |
+| 6 | `precondition` | pass/fail/hold | Named deterministic check / lifecycle from-states. |
 | 7 | `contentCheck` | pass/fail | Typed hook (DLP, PII, classification scan). |
 | 8 | `requireApproval` | pass/hold | Human sign-off, optionally conditional. |
 | 9 | `dualAuthorization` | pass/hold | Two distinct identities required. |
@@ -261,6 +282,7 @@ The complete gate set (unchanged in v0.2):
 | 12 | `disclosure` | pass/fail | Result classification ↔ allowed recipients/sinks (reads). |
 | 13 | `emissionControl` | pass/fail/hold | Deconfliction/authorization for emitting effects. |
 | 14 | `requireExplanation` | pass/fail | Action must carry a recorded rationale (assess). |
+| 15 | `requireMatch` | pass/fail/hold | Intent must match exactly one open obligation in a declared registry; reserved at staging, consumed at settlement (§7.16). |
 
 ### 7.1 `rate`
 `N/window` where window ∈ `second|minute|hour|day`. (Duration-*valued* fields elsewhere — `requireApproval.timeout`, `quantityCap.window` — use the `Ns/Nm/Nh/Nd` shorthand instead; the two forms are not interchangeable.) Optional `per:` to scope the count.
@@ -316,7 +338,19 @@ Order.ship:
   precondition: { from: [packed] }          # transition from-states
 engage:
   precondition: [positiveIdentification]
+issueRefund:                                # a hold-capable check (CS-026) names its resolver
+  precondition:
+    checks: [matchesOpenCase]
+    resolvers: role:support-supervisor
 ```
+
+**Three results (CS-026).** A named check resolves **pass / fail / hold**. `hold` suspends the intent for human resolution through the held lifecycle (§4.4, §12) — there is no new state. Its use is bounded by three rules:
+
+1. **Outages fail; only readable ambiguity holds.** A check that cannot reach its source system MUST resolve `fail`; a check that raises is a dependency failure under §10 — the gateway MUST map a crash to `fail`, never to `hold`. `hold` is legal only when the data was read successfully AND the result is judgment-shaped (multiple matching records, a near-tolerance value, a field that means "ask a human"). If outages held, every registry blip would become a human interruption and fail-closed would silently degrade into fail-to-a-queue that gets rubber-stamped; scarce holds get read, constant holds get ignored.
+2. **A hold carries a machine-readable reason code** (§11) or it is invalid: the gateway MUST treat a code-less hold as a check implementation error — resolve `fail`, log loudly. The human resolving the hold must see *why* it paused without reading check code.
+3. **Opt-in per check.** A check declares hold capability in its registry declaration (`holdCapable`, docs/06 §5); two-valued checks remain valid indefinitely.
+
+Who may release a precondition hold is the gate's `resolvers:` field, or the deployment's default resolver role — see the release-contract rules in §12 (CS-027). At dispatch-time re-validation (CS-017) nothing changes: `precondition` is volatile, and any non-PASS at the claim — including a fresh `hold` — settles `CANCELLED`/`stale-guard:precondition`; a claimed row is never re-suspended.
 
 ### 7.7 `contentCheck`
 A typed hook returning pass/block. Hooks are registered code; the policy names one.
@@ -339,7 +373,9 @@ Holds the action for a human. Fields: `when` (condition; default always), `appro
 refund:
   requireApproval: { approvers: role:finance-manager }
 ```
-`approvers` names (`role:…`) resolve against the **identity layer** — the session/`IdentityProvider` seam (architecture decision 11) — not the registry. They are the one referenced namespace §13 rule 1 does not lint: the registry declares the world the agent acts on; who may approve is an organisational fact the deployment owns (CS-025).
+`approvers` names (`role:…`) resolve against the **identity layer** — the session/`IdentityProvider` seam (architecture decision 11) — not the registry. They are the one referenced namespace §13 rule 1 does not lint: the registry declares the world the agent acts on; who may approve is an organisational fact the deployment owns (CS-025). The same rule covers the `resolvers:` field on hold-capable gates (§7.6, §7.16).
+
+**`timeout` is enforced (CS-028).** A held row expires at the earlier of the holding gate's `timeout` and the staging TTL (CS-017), via an active sweep (§12): an expired hold settles `CANCELLED`/`expired-hold:<gate>` (a normative settle reason, like `stale-decision`), preserving the original hold reason code in the audit record. `onTimeout: deny` (default) cancels; `onTimeout: allow` satisfies **this gate's contract only** — the row promotes iff every other release contract is also satisfied (§12, CS-027). A late release never resurrects an expired row (CS-017 rule 1 unchanged).
 
 ### 7.9 `dualAuthorization`
 Two **distinct** identities must approve (the actor cannot self-approve). Fields: `approvers`, `quorum: 2` implied, `distinctFrom: actor`.
@@ -412,6 +448,69 @@ standing:
     enables: { transition: { Order: [sign] } }
 ```
 
+### 7.16 `requireMatch` (CS-032 — v0.6)
+
+An intent MUST correspond to **exactly one open obligation** in a declared obligation registry (docs/06 §5b), within declared tolerance; the obligation is **reserved at staging and consumed at settlement** (§12, CS-035). Applies to `effect`, `transition`, and `record` actions; resolves pass / fail / hold. This is the gate for the *in-bounds wrong action*: every other gate compares the intent against constants the policy carries; `requireMatch` checks the relation between the intent and a record created earlier, by a different authority, in a system the agent cannot write to — an invoice is payable only against an open order, a dose is administrable only against an active prescription. (Rationale, including why this could not be a `precondition` hook or connector logic, is argued in the change set, CS-032.)
+
+```yaml
+gates:
+  pay:
+    requireMatch:
+      registry: erp.purchase_orders            # declared obligation registry (docs/06 §5b)
+      match:
+        - "obligation.vendorId == data.vendorId"
+        - "obligation.state == 'open'"
+        - "obligation.line.state == 'unconsumed'"
+        - { field: obligation.line.amount, matches: data.amount, within: "10%" }   # tolerance clause (CS-033)
+      provenance:
+        - "obligation.vendor.domain == data.sourceDomain"
+      consume: obligation.line
+      onNoMatch: deny              # deny (default) | hold
+      onAmbiguous: hold            # hold (default); `allow` is not a legal value
+      resolvers: role:ap-clerk     # who releases a hold this gate raises (§12, CS-027)
+```
+
+**Fields.**
+
+| Field | Required | Meaning |
+|---|---|---|
+| `registry` | MUST | A declared obligation registry (docs/06 §5b). Unknown ⇒ load error (§13 rule 14). |
+| `match` | MUST | A conjunction over the matched obligation: each entry is either a §8-grammar comparison between `obligation.*` and the §8 namespaces (`data.*`, `resource.*`, `actor.*`, `context.*`), or a **tolerance clause** (below). |
+| `provenance` | MAY | Additional conjunction binding the matched obligation's counterparty fields to the intent's declared source evidence. Kills the valid-but-wrong-pointer class: a real identifier resolving to a different counterparty's record. Requires the intent type to carry that evidence as typed fields. |
+| `consume` | MUST for `effect`/`transition`; MAY be `none` for pure verification on `record` | The obligation path marked spent at settlement (§12). `consume: none` on an irreversible effect lints as a warning (§13 rule 16). |
+| `onNoMatch` | MAY | Verdict when zero candidates match: `deny` (default) or `hold`. |
+| `onAmbiguous` | MAY | Verdict when more than one candidate matches: `hold` (default). `allow` is not a legal value (§13 rule 17); the gateway MUST NOT auto-select among candidates. |
+| `resolvers` | MAY | The `role:` name (identity seam, §7.8) that may release a hold this gate raises; falls back to the deployment default resolver role (§12, CS-027). |
+
+**Tolerance clauses (CS-033).** Approximate equality under declared tolerance is a structured match entry — deliberately **not** a condition-grammar operator (§8 is unchanged):
+
+```yaml
+- { field: obligation.line.amount, matches: data.amount, within: "10%" }   # relative, of the obligation-side value
+- { field: obligation.dose,        matches: data.dose,   within: 0 }       # exact, stated
+```
+
+`field` is an `obligation.*` path; `matches` is a §8 namespace path; `within` is `"N%"` (relative to the obligation-side value) or an absolute number in the field's unit; `0` means exact. Tolerance applies to numeric/money fields only (§13 rule 14).
+
+**Semantics.**
+
+1. **Deterministic evaluation at decision time** (§12 step 4). The gateway queries the registry with the typed selector derived from `match`. Candidate count 1 ⇒ the remaining clauses evaluate against that obligation; 0 ⇒ `onNoMatch`; >1 ⇒ `onAmbiguous`. No model output participates.
+2. **Agent-independent read path (CS-036).** Every `obligation.*` operand resolves from the registry's response; agent-supplied copies of obligation data are never match inputs. The intent MAY carry an obligation **pointer** (e.g. `data.poId`); the gateway then queries by id and still evaluates the full `match` conjunction against the re-read record — a pointer narrows the query, it never substitutes for it.
+3. **Volatile gate, refined.** `requireMatch` joins the CS-017 dispatch-claim re-validation set — with one refinement: because the obligation is reserved at staging (§12), the claim checks **reservation liveness** (still held, registry reachable) rather than re-running the query. Reservation lost ⇒ `CANCELLED`/`stale-guard:requireMatch`.
+4. **Runtime resolution (CS-005 applies).** An `obligation.*` path absent or null on the matched record fails the gate closed. Registry unreachable ⇒ `failureMode` (§10); for `irreversible` effects this MUST resolve closed.
+5. **Composition unchanged** (§7): AND with all other matching gates. A matched obligation never relaxes a `valueLimit`, a list, an approval, or any other gate.
+
+**When a plain `precondition` is enough (adoption path).** `requireMatch` is the obligation-checking pattern *promoted into policy syntax* — it is not the only way to run the pattern, and it is deliberately not the place to start. A registered precondition check that queries the system of record and compares typed fields gives the same protection on any gateway, with no registry declaration and roughly fifty lines of code:
+
+```yaml
+gates:
+  pay:
+    precondition: [matchesOpenPurchaseOrder]   # the whole feature, v0.5-style
+```
+
+The check follows five rules (they are `requireMatch`'s semantics, hand-carried): read every compared field from the source, never from the intent (the intent may carry an id to narrow the query); compare typed fields only, never free text; fail closed with a reason code on no-match, several-matches, and source-down alike; be deterministic; write the tolerance down as a visible constant. Spending is left to the record system — a real ERP consumes the order line when the invoice posts, an EMR fills the slot when the dose is charted — so the double-spend window closes in the system that owns the record. Preconditions are already volatile (CS-017), so dispatch-time re-checking comes for free.
+
+Reach for `requireMatch` only when you need what a named check cannot give: the match rule **in the policy file** (reviewers, the linter, and the TCK see "payment requires an open order" instead of a function name); `ambiguous ⇒ hold` routed to a named resolver instead of a bare fail; **gateway-managed reservation and consumption** — which matters exactly when the record system does *not* enforce spending itself (a spreadsheet, a homegrown list, a slow-posting upstream); and the standardized `obligationRefs`/`consumption` audit lineage. If your system of record already consumes transactionally and your reviewers accept a named check, the precondition *is* the right-sized tool — using it is not a lesser deployment, and a policy that outgrows it can move to `requireMatch` later without changing the check's semantics.
+
 ---
 
 ## 8. Condition expression language
@@ -448,6 +547,8 @@ list       := "[" [ literal ("," literal)* ] "]"
 **Functions** (the complete set): `count(scope, window)`, `now()`, `window("HH:MM-HH:MM")`, `spend(window)`. No others.
 
 String literals may be single- or double-quoted. The right side of `in` / `not in` is a list literal or a function returning a collection/range — `context.time in window("08:00-18:00")` (CS-013; this legalises the form §7.15's example already used).
+
+**This grammar is unchanged in v0.6.** The `requireMatch` tolerance comparison is deliberately a structured gate field (§7.16, CS-033), not an operator — CS-013's widening of `in` remains the only grammar change since v0.1. Inside `requireMatch.match`/`provenance`, string entries use this grammar with one additional read-only namespace, `obligation.*`, resolved from the registry's response (CS-036); `obligation.*` is not available anywhere else a condition appears.
 
 **Runtime resolution (CS-005).** Unknown paths are rejected at policy load (§13.9). If a referenced path is **absent or null at runtime** (e.g. `resource.foo` is missing on the resolved target), the gate whose condition referenced it **fails closed** (resolves DENY) — this is distinct from the condition evaluating to `false`. A condition error MUST NOT silently pass a gate.
 
@@ -501,6 +602,8 @@ Levels: `none` | `basic` (decisions only) | `full` (decisions + parameters + gat
 | `approval` | Approver(s), quorum, outcome, timing — if applicable. |
 | `outcome` | Connector result: `success` \| `failure` (+ reason) \| `not_executed`. |
 | `resultRefs` | Stable downstream identifier(s) of the effect's result — the connector-returned id(s) of the created/changed record(s) (ledger entry, payment, message id, …). A **list**: one action may fan out to several records (a payment *and* its ledger entry), so it is the lineage/correlation key, not a single id. Populated for executed/settled effects; empty otherwise. The handle(s) an external system uses to locate, reconcile, or compensate the effect; the gateway records them but does **not** itself perform the reversal. |
+| `obligationRefs` | (v0.6, CS-037) Registry + obligation/line id(s) a `requireMatch` decision matched, with the candidate count (`1`, `0`, or `n>1` for a held-ambiguous decision). The **entitlement-side** lineage key, complementing `resultRefs`: `resultRefs` locate what the effect *produced*; `obligationRefs` locate what *entitled* it. |
+| `consumption` | (v0.6, CS-037) `reserved` \| `consumed` \| `released`, with the consume receipt id; for a `window`-capability registry, the declared residual window (the CS-018 pattern: priced, not hidden). |
 | `correlationId` | Session/transaction id for replay. |
 
 **Transactional audit (CS-006).** For an executed or settled `effect`, the audit record **MUST** be written in the **same transaction** as the state change it records (the outbox settle), so there can be neither an effect that occurred without a record nor a record of an effect that did not occur. Refusals and holds are recorded **before** the result is returned to the agent. Best-effort side-channel logging is **not** sufficient for the audit log.
@@ -508,6 +611,22 @@ Levels: `none` | `basic` (decisions only) | `full` (decisions + parameters + gat
 **Remediation is downstream (boundary note).** The gateway's role in undoing a wrong-but-allowed effect is to make it *findable and actionable* — a complete, attributable record carrying `resultRefs` (CS-009) — **not** to perform the reversal. The compensating action is executed by the system of record, or as a gated operator action (§9), never reconstructed inside the gateway.
 
 **Scope boundary — the gateway governs agent→world, not world→world.** The unit of enforcement is **one resolved action**; a compound/batch intent is decomposed into N actions, each independently authorized, audited, killed, and carrying its own `resultRefs` (bulk-as-one-effect is out of scope). The gateway records the *direct* effects of an agent action; it does **not** see or govern the **cascade** those effects trigger in downstream systems (a posted payment that fires a webhook → a journal entry → a covenant alert). Therefore an action's `reversibility`, `compensation`, `resultRefs`, and the kill guarantee all describe the **direct** effect only — never the world's reactions to it. Cascade reconciliation is the downstream systems' responsibility, joined back via `resultRefs`/`correlationId`; multi-step transactional consistency across several agent intents (sagas) is out of scope (the audit trail makes them reconstructable and externally unwindable, but Stele guarantees no atomicity across intents). Design analysis: `docs/03` → "Multi-effect & cascade".
+
+**Reason codes and retry classes (CS-029 — v0.6).** Every deny/hold reason a gate or registered check produces is a **machine-readable code** with a declared **retry class**, returned to the agent alongside the decision:
+
+- `retryable` — the defect is in the intent; fix it and resubmit (amount outside tolerance, missing field, busy rate window).
+- `terminal` — nothing about this intent family is fixable by the agent; do not resubmit (no obligation exists, denylisted destination, unknown action).
+- `escalate` — stop and surface to a human on the **agent's** side (distinct from a gateway hold, which queues on the operator's side).
+
+A code with no declared class defaults to `terminal` — the safe direction is to stop retrying. Registered checks declare their codes and classes in the registry (docs/06 §5); built-in gate reasons carry normative classes: `valueLimit`, `rate`, `quota`, `quantityCap`, `spendLimit`, `window`, `contentCheck` ⇒ `retryable`; `allowlist`/`denylist`, `disclosure`, unknown-action, scope refusals ⇒ `terminal`; `stale-decision` ⇒ `retryable` (resubmit for a fresh decision); `expired-hold` ⇒ `escalate`. The audit record carries code and class for every refusal (this section's table, `decision`/`outcome`).
+
+**Agent feedback visibility (CS-030 — v0.6).** What the *agent* receives on a deny or hold is a declared choice, per gate config or per check declaration, via an optional `feedback:` key:
+
+- `code` — reason code + retry class only.
+- `code+fields` — **the default**: code, class, and *which* intent fields failed the comparison — never the record-side values they were compared against.
+- `code+evidence` — the full comparison including record-side values; for trusted internal loops only.
+
+Visibility governs the agent-facing result only; the audit record always carries everything — **redact on return, never on write**. Reason codes remain an oracle even at `code` (each probe maps one policy wall), so the countermeasure is detection, not blunting: audit tooling SHOULD surface deny-rate and reason-code distribution per agent principal — a converging loop and a mapping loop look different in that data. Repeated `ambiguous` outcomes on one obligation registry SHOULD likewise be surfaced: they signal near-duplicate injection into the obligation store (CS-037).
 
 ---
 
@@ -517,7 +636,7 @@ For each attempted action the gateway MUST proceed strictly in this order, stopp
 1. **Resolve** the action's kind, resource, name, and attributes from the registry. Unknown ⇒ DENY.
 2. **Authorize** (§6.2): default deny → deny-wins → allow-match.
 3. **Inject scope** (§6.3).
-4. **Evaluate gates** (§7), cheapest/deterministic first; `requireApproval`/`dualAuthorization` last. Any `fail` ⇒ DENY; else any `hold` ⇒ HOLD (await approval, then re-enter at step 5 on grant).
+4. **Evaluate gates** (§7), cheapest/deterministic first; `requireApproval`/`dualAuthorization` last. Any `fail` ⇒ DENY; else any `hold`(s) ⇒ HOLD — the intent is staged carrying the release contract of **every** holding gate (CS-027, below), and re-enters at step 5 once all are satisfied.
 5. **Check kill-switch** (§9). Active ⇒ HALT.
 6. **Execute** via the connector as one transaction (effects staged per §4.4 durability rule).
 7. **Record** the audit entry (§11) — for every outcome, including refusals.
@@ -529,9 +648,24 @@ On any dependency error, apply `failureMode` (§10).
 **Decision freshness (CS-017).** This evaluation runs at **decision time**; for a staged effect (§4.4) the gateway MUST bound how stale that decision can get before dispatch, two ways:
 
 1. **Decision TTL.** Every staged action carries an expiry, set at staging from gateway configuration (deployment config, **not** policy syntax — the language stays frozen). The default MUST be finite; for `irreversible` effects it SHOULD be short (minutes–hours, not days). A row claimed at or after its TTL settles `CANCELLED` with reason `stale-decision` (audited; the agent's ticket resolves to a recoverable refusal). An approval that arrives after expiry does not resurrect the row — the intent must be re-submitted and re-decided.
-2. **Volatile-gate re-validation at dispatch.** Inside the dispatch claim — after the §9 kill re-check, before the connector call (order: **kill → TTL → volatile gates → connector**) — the gateway re-evaluates the action's **volatile** gates: `allowlist`/`denylist` (set membership changes), `window` (time has passed), `precondition`/`emissionControl` (world state changes), including registry-intrinsic preconditions. It MUST do so for `irreversible` effects and SHOULD for all staged effects. A dispatch-time failure settles `CANCELLED` with reason `stale-guard:<gate>` (audited), never a partial dispatch.
+2. **Volatile-gate re-validation at dispatch.** Inside the dispatch claim — after the §9 kill re-check, before the connector call (order: **kill → TTL → volatile gates → connector**) — the gateway re-evaluates the action's **volatile** gates: `allowlist`/`denylist` (set membership changes), `window` (time has passed), `precondition`/`emissionControl` (world state changes), including registry-intrinsic preconditions; for `requireMatch` the claim checks **reservation liveness** rather than re-running the query (§7.16 rule 3, CS-035). It MUST do so for `irreversible` effects and SHOULD for all staged effects. A dispatch-time failure settles `CANCELLED` with reason `stale-guard:<gate>` (audited), never a partial dispatch.
 
 **Non-volatile gates are NOT re-run**, by definition: `valueLimit` and `contentCheck` judge the staged payload, which is frozen; the counters (`rate`/`quota`/`quantityCap`/`spendLimit`) were consumed at decision time — re-running them double-counts; and a `requireApproval`/`dualAuthorization` grant *is* the release — its freshness is bounded by the TTL (rule 1), not by re-asking. This is **not dispatch-time re-authorization**: `allow`/`deny` and scope *decisions* are not re-derived, approvals are not re-requested; the TTL bounds how stale any decision may get, and re-validation covers only the gate classes whose facts move independently of the agent. The kill switch remains the authoritative dispatch check (§9); CS-017's checks run inside the same claimed transaction, after it.
+
+**Hold release, expiry, and dedupe (CS-027, CS-028, CS-031 — v0.6).** When more than one gate resolves `hold` for the same intent, the staged row carries the **release contract of every holding gate**, and promotion to dispatch requires **each contract satisfied** — satisfying one never satisfies another, and a resolved hold is not a bypass of anything (the gates all evaluated at decision time; dispatch re-validates the volatile ones as always). A release contract is what the holding gate demands: for `requireApproval`, its approvers/quorum/timeout; for `dualAuthorization`, two distinct non-actor identities; for a holding `precondition` or `requireMatch`, the gate's `resolvers:` role (identity seam, §7.8) or, when absent, the deployment's **default resolver role** (gateway configuration, like decision TTLs — never policy syntax). A hold whose contract names no approver/resolver and has no deployment default MUST be refused fail-closed at decision time, audited `hold-unresolvable` — never staged as a row anyone could release. Each release is recorded like an approval (who, when, which contract).
+
+Held rows **expire actively** (CS-028): the gateway MUST sweep held rows (the dispatch worker's loop is sufficient) and settle an expired hold `CANCELLED`/`expired-hold:<gate>`, preserving the original hold reason code — see §7.8 for the `timeout`/`onTimeout` rules. And holds **dedupe** (CS-031): a new hold whose (agent, action, reason code, matched-candidate refs) equal an already-open held row's within the deployment's dedupe window collapses into that row — attempt count incremented, latest intent recorded, an audit record still written per attempt. Denies are cheap (pre-commit, no side effect); holds spend human attention, the scarcest resource in the system — ten variants of the same unmatched invoice are one question wearing ten disguises, and the operator sees one queue item. (A per-principal ceiling on open holds is deferred to v0.6.1.)
+
+**Obligation reservation (CS-035 — v0.6).** For an intent that passed a `requireMatch` gate, obligation state tracks the staged effect's lifecycle exactly — otherwise the gate re-opens the races v0.4/v0.5 closed:
+
+- **Decision (step 4):** query + match (§7.16); on pass, the matched candidate's ref enters the decision record (`obligationRefs`, §11).
+- **Staging (§4.4 commit):** the gateway calls `reserve(ref, intent_id)`, and the reservation MUST be in place before the staging commit returns *accepted/pending* — reservation is what closes the double-spend window in the decide→dispatch gap that the decision TTL alone does not. `AlreadyReserved`/`AlreadyConsumed` here ⇒ the intent settles refused `no-match`, audited.
+- **Dispatch claim:** order per CS-017, extended — kill → TTL → volatile gates (including reservation liveness) → connector.
+- **Settlement:** `consume(ref, intent_id)` executes with the settle, per the registry's declared capability (docs/06 §5b): **`transactional`** ⇒ inside the same transaction as the effect's commit and the CS-006 audit write — no consumed-without-effect, no effect-without-consumed; **`window`** ⇒ immediately after connector confirmation, with the declared residual window surfaced in the audit record (the CS-018 pattern: priced, not hidden).
+- **Release:** any terminal non-success — `CANCELLED` (kill, `stale-decision`, `stale-guard`, `expired-hold`, rejection) or `FAILED` — MUST release the reservation. A TTL expiry therefore frees the obligation for a re-submitted intent.
+- **Orphan recovery:** a crash between `reserve` and the staging commit leaves a reservation with no row. Every reservation therefore carries a TTL of its own, agreed with the adapter and **at least** the staged row's decision TTL; the adapter MUST expire orphaned reservations, the gateway's release path is idempotent (`NotHeld` is a no-op), and a deployment SHOULD reconcile reservations against staged rows on gateway restart.
+- **Batches (CS-023):** reservations for all operations in a batch are taken with the batch's atomic staging; any refused operation refuses the batch and releases every reservation taken for it.
+- **Idempotency:** `reserve`/`consume`/`release` are idempotent per (obligation ref, intent id); a retry never double-consumes; a second **distinct** intent against a consumed line resolves `no-match`.
 
 ---
 
@@ -539,7 +673,7 @@ On any dependency error, apply `failureMode` (§10).
 1. Every resource/action/scope/hook name referenced exists in the registry — **including names in `deny`** (CS-016). A deny of an undeclared name adds no protection (default-deny already refuses unknowns) and is almost always a typo that would otherwise silently arm itself as a no-op. To pre-forbid a capability, declare the action in the registry and deny it (the pattern the worked registries use for `prescribe`/`discontinue`). *(Approver `role:` names are exempt — they resolve at the identity seam, not the registry; §7.8, CS-025.)*
 2. No `allow` and `deny` that *only* a human could disambiguate — `deny` always wins, but overlapping intent SHOULD warn.
 3. Every `transition` action referenced has declared `from` states.
-4. Actions with `reversibility == irreversible` and no `requireApproval`/`dualAuthorization`/`precondition` ⇒ **warn**.
+4. Actions with `reversibility == irreversible` and no `requireApproval`/`dualAuthorization`/`precondition`/`requireMatch` ⇒ **warn** (CS-038: `requireMatch` counts as a satisfying guard).
 5. `failureMode: open` on an `irreversible` action ⇒ **error** unless explicitly acknowledged.
 6. `'*'` grants ⇒ **warn** (encourage explicit enumeration).
 7. `assess` actions with `explainability: required` but no `requireExplanation` gate ⇒ **error**.
@@ -549,6 +683,11 @@ On any dependency error, apply `failureMode` (§10).
 11. An action listed in both `deny` and a `standing` rule's `enables` ⇒ **error** — deny always wins (§6.2), so the standing grant is unsatisfiable (§7.15, CS-010).
 12. A bare action name in `allow` that resolves to actions on more than one resource ⇒ **warn** — the grant applies everywhere the name is declared; use the `{ Entity: [names] }` map form to disambiguate (§6.1, CS-012).
 13. `dualAuthorization` with an explicit `quorum` < 2 ⇒ **error** (contradicts the gate's definition, §7.9).
+14. (v0.6, CS-038) `requireMatch.registry` names a declared obligation registry; every `obligation.*` path in `match`/`provenance`/`consume` exists in that registry's declared schema; a tolerance clause (`within`, §7.16) applies to a numeric/money field ⇒ else **error**.
+15. (v0.6, CS-038) The policy grants the same agent `record`/`effect`/`transition` on the resource backing an obligation registry it matches against ⇒ **error** — creation/execution separation: the agent must not author its own obligations (§1 non-goals). Where the registry is external and the overlap is not statically visible, emit **info** pointing at the deployment check (docs/06 §5b).
+16. (v0.6, CS-038) `requireMatch` with `consume: none` on an `irreversible` effect ⇒ **warn** (verification without consumption leaves the double-spend window open, §12).
+17. (v0.6, CS-038) `onAmbiguous: allow` ⇒ **error** (illegal value; §7.16 — the gateway never auto-selects among candidate obligations).
+18. (v0.6, CS-038) A check declared `holdCapable: true` with no declared `reasonCodes` ⇒ **error** (every hold it returns would be code-less and resolve fail, §7.6 rule 2); a hold-capable check gated with no `resolvers` and no visible deployment default resolver role ⇒ **warn** (§12, CS-027 — the warning names the deployment fallback).
 
 ---
 
@@ -596,7 +735,7 @@ gates:
 ```
 
 ### 14.2 Ward nurse assistant (healthcare — observe, assess, record, effect, transition)
-*Reads scoped to the nurse's ward; sealed records need break-glass; triage is an explained, confirmed assessment; administration enforces five-rights and a per-patient dose cap and is irreversible; signing an order is a gated transition; prescribing is forbidden.*
+*Reads scoped to the nurse's ward; sealed records need break-glass; triage is an explained, confirmed assessment; administration is irreversible, enforces five-rights, and (v0.6) must match an active prescription's unconsumed schedule slot — the per-patient dose cap remains as defence-in-depth behind the prescription's own frequency; signing an order is a gated transition; prescribing is forbidden.*
 ```yaml
 apiVersion: stele/v0.1
 agent: ward-nurse-assistant
@@ -630,6 +769,18 @@ gates:
     requireApproval: { when: "data.acuity <= 2", mode: confirm, approvers: role:clinician }
   administer:                                # effect, irreversible
     precondition: [fiveRightsVerified, notDiscontinued]
+    requireMatch:                             # v0.6: the dose is OWED, not merely in-bounds (§7.16)
+      registry: emr.prescriptions
+      match:
+        - "obligation.patientId == resource.patientId"
+        - "obligation.state == 'active'"
+        - "obligation.drug == data.drug"
+        - "obligation.route == data.route"
+        - "obligation.schedule.slotState == 'unconsumed'"
+        - { field: obligation.dose, matches: data.dose, within: 0 }   # exact, stated
+      consume: obligation.schedule.slot
+      onNoMatch: deny
+      resolvers: role:pharmacist              # two active orders -> held, pharmacist paged
     quantityCap:  { per: resource.patientId, limit: 3, window: 24h, of: data.drug }
     requireApproval: { when: "action.operativeForce == high", approvers: role:clinician }
   Order.sign:                               # transition, operative
@@ -681,7 +832,7 @@ gates:
 ```
 
 ### 14.4 Payments operations agent (finance — tiered effects, dual-auth, sanctions, transition)
-*Reads tenant-scoped; small payments auto-clear, mid-size need approval, large need dual authorization and a new-payee hold; sanctioned destinations are denied; export is forbidden.*
+*Reads tenant-scoped; small payments auto-clear, mid-size need approval, large need dual authorization and a new-payee hold; sanctioned destinations are denied; export is forbidden; (v0.6) every payment must match an open purchase-order line, which it consumes — an unmatched invoice is held for the AP clerk, not silently refused.*
 ```yaml
 apiVersion: stele/v0.1
 agent: payments-ops-agent
@@ -705,6 +856,18 @@ gates:
     denylist:   { field: data.destinationCountry, set: sanctioned-list }
     valueLimit: { field: data.amount, max: 1000000, currency: USD }
     rate:       { limit: 50/hour, per: resource.payeeId }
+    requireMatch:                            # v0.6: no open order, no payment (§7.16)
+      registry: erp.purchase_orders
+      match:
+        - "obligation.vendorId == data.vendorId"
+        - "obligation.state == 'open'"
+        - "obligation.line.state == 'unconsumed'"
+        - { field: obligation.line.amount, matches: data.amount, within: "10%" }
+      provenance:
+        - "obligation.vendor.domain == data.sourceDomain"
+      consume: obligation.line
+      onNoMatch: hold                        # AP clerk sees "no matching PO", not a silent deny
+      resolvers: role:ap-clerk
     requireApproval:
       when: "data.amount > 1000 and data.amount <= 10000"
       approvers: role:payments-manager
@@ -717,6 +880,8 @@ gates:
   Invoice.markPaid:
     precondition: { from: [sent] }
 ```
+
+Three decisions this example produces that no v0.5 gate could: an invoice that matches an open PO line passes limits **and** matching → allow, line consumed at settlement; the same invoice resubmitted → `no-match` (line consumed) → held; an invoice matching nothing → held for the AP clerk. A matched obligation never relaxes the tiers — the $50,000 matched invoice still takes dual authorization (§7.16 rule 5).
 
 ### 14.5 Legal matter assistant (data / business — ties to the repo demo)
 *Reads scoped to the client; time entries and tasks are routine records; the `Engage` transition is legal only from `conflict_check` (the exact behaviour the repo already demonstrates); e-filing is allow-listed to approved courts, partner-approved, and confined to court hours; email is DLP-checked.*
@@ -778,8 +943,8 @@ gates:
 
 **Kinds:** `observe` · `assess` · `record` · `effect` · `transition`
 **Attributes:** `reversibility` · `emission` · `operativeForce` · `resultSensitivity` · `explainability`
-**Gates:** `rate` · `quota` · `valueLimit` · `spendLimit` · `allowlist`/`denylist` · `precondition` · `contentCheck` · `requireApproval` · `dualAuthorization` · `window` · `quantityCap` · `disclosure` · `emissionControl` · `requireExplanation`
+**Gates:** `rate` · `quota` · `valueLimit` · `spendLimit` · `allowlist`/`denylist` · `precondition` · `contentCheck` · `requireApproval` · `dualAuthorization` · `window` · `quantityCap` · `disclosure` · `emissionControl` · `requireExplanation` · `requireMatch`
 **Decisions:** `allow` · `hold` · `deny` · `halt`
 **Top-level keys:** `apiVersion` · `agent` · `extends` · `defaults` · `allow` · `deny` · `scope` · `gates` · `standing` · `killable` · `audit`
 **Precedence:** default deny → deny wins → most-specific allow → all matching gates AND → kill-switch → execute → record.
-**Frozen:** the five kinds, the five attribute names, the fourteen gate types, and the condition operators/functions (unchanged since v0.1; v0.3's only grammar change, CS-013, widens the right side of `in` to accept a function — no new operator or function). Growth is by adding resources, actions, scope predicates, named sets, and hooks — never new language constructs.
+**Frozen:** the five kinds, the five attribute names, the fifteen gate types, and the condition operators/functions. The gate catalog's only amendment since v0.1 is v0.6's `requireMatch` (CS-032, argued in the change set); the grammar's only change remains CS-013 (the right side of `in` accepts a function) — the v0.6 tolerance comparison is a structured gate field (CS-033), not an operator. Growth is by adding resources, actions, scope predicates, named sets, hooks, and obligation registries — never new language constructs; the shape re-freezes at fifteen.

@@ -14,7 +14,7 @@
       "additionalProperties": { "type": "object", "properties": { "type": { "type": "string" }, "digest": { "type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$" } }, "additionalProperties": true }
     },
     "scopePredicates": { "type": "array", "items": { "type": "string" } },
-    "preconditionChecks": { "type": "array", "items": { "type": "string" } },
+    "preconditionChecks": { "type": "array", "items": { "$ref": "#/$defs/preconditionCheck" } },
     "handlers": { "type": "array", "items": { "type": "string" } },
     "hooks": { "type": "array", "items": { "type": "string" } },
     "sinks": { "type": "array", "items": { "type": "string" } },
@@ -23,9 +23,54 @@
       "additionalProperties": { "type": "object", "properties": { "source": { "type": "string" }, "values": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": true }
     },
     "valueSets": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+    "obligationRegistries": {
+      "description": "v1.2 (Stele CS-034): systems of record the requireMatch gate matches against. Semantics in docs/06 section 5b.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/obligationRegistry" }
+    },
     "entities": { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/entity" } }
   },
   "$defs": {
+    "preconditionCheck": {
+      "description": "v1.2 (Stele CS-026/CS-029): a bare name (two-valued check, codes default terminal) or an object declaring hold capability and reason codes with retry classes. holdCapable without reasonCodes is a linter error (Stele rule 18), not a schema error.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "holdCapable": { "type": "boolean" },
+            "reasonCodes": {
+              "type": "object",
+              "additionalProperties": { "enum": ["retryable", "terminal", "escalate"] }
+            }
+          }
+        }
+      ]
+    },
+    "obligationRegistry": {
+      "type": "object",
+      "required": ["connector", "capability", "schema"],
+      "additionalProperties": false,
+      "properties": {
+        "connector": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$" },
+        "capability": { "enum": ["transactional", "window"] },
+        "schema": { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/obligationProperty" } }
+      }
+    },
+    "obligationProperty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "properties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/obligationProperty" } }
+      },
+      "anyOf": [ { "required": ["type"] }, { "required": ["values"] }, { "required": ["properties"] } ]
+    },
     "attrValue": {
       "oneOf": [
         { "type": "string" },

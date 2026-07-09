@@ -94,7 +94,9 @@
         "quantityCap": { "$ref": "#/$defs/quantityCap" },
         "disclosure": { "$ref": "#/$defs/disclosure" },
         "emissionControl": { "$ref": "#/$defs/precondition" },
-        "requireExplanation": { "type": "boolean" }
+        "requireExplanation": { "type": "boolean" },
+        "requireMatch": { "$ref": "#/$defs/requireMatch" },
+        "feedback": { "enum": ["code", "code+fields", "code+evidence"] }
       }
     },
     "rate": {
@@ -149,7 +151,45 @@
           "properties": {
             "from": { "type": "array", "items": { "type": "string" } },
             "checks": { "type": "array", "items": { "type": "string" } },
-            "when": { "type": "string" }
+            "when": { "type": "string" },
+            "resolvers": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "requireMatch": {
+      "description": "v0.6 CS-032: the intent must match exactly one open obligation in a declared obligation registry (RFC section 7.16). Registry existence, obligation.* path typing, and the onAmbiguous/consume rules are linter checks (rules 14-17).",
+      "type": "object",
+      "required": ["registry", "match", "consume"],
+      "additionalProperties": false,
+      "properties": {
+        "registry": { "type": "string", "minLength": 1 },
+        "match": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/matchClause" } },
+        "provenance": { "type": "array", "items": { "$ref": "#/$defs/matchClause" } },
+        "consume": { "type": "string", "minLength": 1, "description": "An obligation.* path marked spent at settlement, or the literal 'none' (pure verification; record actions only — linter rule 16 warns on irreversible effects)." },
+        "onNoMatch": { "enum": ["deny", "hold"] },
+        "onAmbiguous": { "enum": ["hold", "deny"], "description": "'allow' is deliberately not in this enum (RFC section 7.16; linter rule 17)." },
+        "resolvers": { "type": "string" },
+        "when": { "type": "string" }
+      }
+    },
+    "matchClause": {
+      "description": "One conjunct of a requireMatch match/provenance list: a section-8-grammar condition string over obligation.* and the intent namespaces, or a structured tolerance clause (CS-033 — deliberately not a grammar operator).",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "required": ["field", "matches", "within"],
+          "additionalProperties": false,
+          "properties": {
+            "field": { "type": "string", "pattern": "^obligation\\." },
+            "matches": { "type": "string", "minLength": 1 },
+            "within": {
+              "oneOf": [
+                { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?%$" },
+                { "type": "number", "minimum": 0 }
+              ]
+            }
           }
         }
       ]

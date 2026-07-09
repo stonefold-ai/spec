@@ -20,6 +20,18 @@ gates:
     denylist:   { field: data.destinationCountry, set: sanctioned-list }
     valueLimit: { field: data.amount, max: 1000000, currency: USD }
     rate:       { limit: 50/hour, per: resource.payeeId }
+    requireMatch:                             # v0.6: no open order, no payment (RFC §7.16)
+      registry: erp.purchase_orders
+      match:
+        - "obligation.vendorId == data.vendorId"
+        - "obligation.state == 'open'"
+        - "obligation.line.state == 'unconsumed'"
+        - { field: obligation.line.amount, matches: data.amount, within: "10%" }
+      provenance:
+        - "obligation.vendor.domain == data.sourceDomain"
+      consume: obligation.line
+      onNoMatch: hold                         # AP clerk sees "no matching PO", not a silent deny
+      resolvers: role:ap-clerk
     requireApproval:
       when: "data.amount > 1000 and data.amount <= 10000"
       approvers: role:payments-manager

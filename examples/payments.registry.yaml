@@ -4,9 +4,10 @@ domain: payments
 # Defines the Payment entity and the `pay` action the policy references.
 
 connectors:
-  ledger-sql: { type: sql }       # serves observe / record / transition
-  ledger-pay: { type: method }    # the effect binding that performs `pay`
-  export:     { type: method }    # binding for exportData (denied by policy)
+  ledger-sql:    { type: sql }       # serves observe / record / transition
+  ledger-pay:    { type: method }    # the effect binding that performs `pay`
+  export:        { type: method }    # binding for exportData (denied by policy)
+  erp-po-adapter: { type: method }   # obligation-registry adapter (query/reserve/consume/release)
 
 scopePredicates:    [ tenantOf ]
 preconditionChecks: [ payeeCoolingOffElapsed ]   # named check (pass/fail) you implement
@@ -14,6 +15,21 @@ handlers:           [ recordLedgerEntry ]        # named post-action handler you
 
 namedSets:
   sanctioned-list: { source: "sets/sanctioned-countries.txt" }
+
+obligationRegistries:               # v1.2 (docs/06 §5b): the open purchase order is the obligation
+  erp.purchase_orders:
+    connector: erp-po-adapter
+    capability: transactional        # ERP posting consumes the line in its own transaction
+    schema:
+      vendorId: { type: string }
+      state:    { values: [open, closed, cancelled] }
+      vendor:
+        properties:
+          domain: { type: string }
+      line:
+        properties:
+          amount: { type: decimal }
+          state:  { values: [unconsumed, reserved, consumed] }
 
 entities:
 
@@ -64,6 +80,8 @@ entities:
           currency:           { type: string }
           destinationCountry: { type: string }
           newPayee:           { type: boolean }
+          vendorId:           { type: string, required: true }   # match input (RFC §7.16)
+          sourceDomain:       { type: string }                   # source evidence for provenance
         resolve:
           payee: { entity: Payee }
       exportData:

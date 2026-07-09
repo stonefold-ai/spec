@@ -47,11 +47,11 @@ Declared facts about an action that policies reason over. *(Stele `01` §5.)*
 
 The gateway's verdict on an action.
 
-- **allow** — permitted; it runs. **hold** — paused for a human (approval). **deny** — refused. **halt** — stopped by the kill-switch.
+- **allow** — permitted; it runs. **hold** — paused for a human (an approval gate, or a hold-capable check/`requireMatch` reporting judgment-shaped ambiguity; released only when *every* holding gate's contract is satisfied — Stele `01` §12). **deny** — refused. **halt** — stopped by the kill-switch.
 
 ---
 
-## Gate types (the 14)
+## Gate types (the 15)
 
 Deterministic conditions attached to actions in the policy. Each: what it checks + example. *(Stele `01` §7.)*
 
@@ -69,6 +69,7 @@ Deterministic conditions attached to actions in the policy. Each: what it checks
 - **disclosure** — bind a read's result classification to allowed sinks. *Ex:* `restricted` records only to `careTeam`.
 - **emissionControl** — authorize/deconflict an emitting effect. *Ex:* radar sweep needs `emconAuthorized`.
 - **requireExplanation** — the action must carry a rationale. *Ex:* a triage `assess`.
+- **requireMatch** *(v0.6)* — the intent must match exactly one open obligation in a declared registry, which it consumes on settlement. *Ex:* `pay` only against an open purchase-order line — the same line can't pay two invoices.
 
 ---
 
@@ -77,7 +78,7 @@ Deterministic conditions attached to actions in the policy. Each: what it checks
 Named code the registry declares and the gateway invokes. Full reference with signatures in `06` §6; in brief:
 
 - **scope predicate** — limits *which records* an actor may touch. *In:* actor → *out:* a filter / authz. *Ex:* `tenantOf(actor)` → `WHERE tenant_id = …`.
-- **precondition check** — a yes/no test before an action. *In:* context → *out:* pass/fail. *Ex:* `payeeCoolingOffElapsed`.
+- **precondition check** — a deterministic test before an action. *In:* context → *out:* pass/fail — or hold, if declared `holdCapable` (v0.6). *Ex:* `payeeCoolingOffElapsed`.
 - **content hook** — inspects the *payload* of an action. *In:* content → *out:* pass/block. *Ex:* `dlp.basic`.
 - **disclosure sink** — a named destination a read's result may flow to. *Ex:* `careTeam`.
 - **post-action / effect handler** — the code that performs an effect or a follow-up. *In:* action+context → *out:* result. *Ex:* `ledger-pay` (the wire), `recordLedgerEntry` (the ledger line).
@@ -100,6 +101,16 @@ The adapter that fulfils an action against a real substrate; the agent never see
 - **Value sets** — reusable enums for properties. *Ex:* `currentState: [draft, sent, paid]`.
 - **Policy signing** — the gateway only runs policies signed off by an authority, so a tampered or self-modified rulebook can't take effect. *(Status and semantics: `07` §5 — the single home for signing.)*
 - **Agent Policy Officer** — the accountable person who reviews, tests, and signs off a policy before it runs.
+
+## Obligation matching (v0.6)
+
+- **Obligation** — a record that entitles a bounded number of actions: created *before* the intent, by a *different* authority, and *spent* when acted on. *Ex:* an open purchase-order line; an active prescription's dose slot. *(Stele `01` §7.16.)*
+- **Obligation registry** — the declared system of record obligations live in; the gateway matches against it and consumes from it, but never stores or edits obligations. *Ex:* `erp.purchase_orders`. *(`06` §5b.)*
+- **Reservation / consumption** — the obligation is *reserved* when the matched effect is staged (nothing else can match it) and *consumed* when the effect settles; any cancellation *releases* it. *Ex:* two invoices race for one PO line — the second gets `no-match`. *(Stele `01` §12.)*
+- **Tolerance clause** — a structured "approximately equal" comparison in a `requireMatch`, with the tolerance written down. *Ex:* invoice amount within 10% of the order line. *(Stele `01` §7.16.)*
+- **Reason code + retry class** — every deny/hold carries a machine-readable code classed `retryable` (fix the intent, resubmit), `terminal` (stop — nothing to fix), or `escalate` (surface to a human on the agent's side). *Ex:* `amount-outside-tolerance: retryable`; `no-open-match: terminal`. *(Stele `01` §11.)*
+- **Feedback visibility** — how much of the comparison the *agent* is told on a refusal: `code`, `code+fields` (default), or `code+evidence`; the audit record always gets everything. *(Stele `01` §11.)*
+- **Resolver** — the role that may release a hold raised by a non-approval gate (a hold-capable check or `requireMatch`). *Ex:* `role:ap-clerk` resolves "no matching PO". *(Stele `01` §12.)*
 
 ---
 

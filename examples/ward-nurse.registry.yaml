@@ -4,13 +4,29 @@ domain: ward-nurse
 # Shows assess / record / effect / transition actions named directly.
 
 connectors:
-  ehr-sql: { type: sql }     # serves observe / record / transition
-  emar:    { type: method }  # medication-administration binding
-  paging:  { type: method }  # paging binding
+  ehr-sql:           { type: sql }     # serves observe / record / transition
+  emar:              { type: method }  # medication-administration binding
+  paging:            { type: method }  # paging binding
+  emr-prescriptions: { type: method }  # obligation-registry adapter (query/reserve/consume/release)
 
 scopePredicates:    [ inWard, forPatientInWard ]
 preconditionChecks: [ fiveRightsVerified, notDiscontinued ]
 sinks:              [ careTeam ]
+
+obligationRegistries:               # v1.2 (docs/06 §5b): the prescription is the obligation
+  emr.prescriptions:
+    connector: emr-prescriptions
+    capability: transactional        # EMR charting consumes the slot in its own transaction
+    schema:
+      patientId: { type: string }
+      state:     { values: [active, completed, discontinued] }
+      drug:      { type: string }
+      route:     { type: string }
+      dose:      { type: decimal }
+      schedule:
+        properties:
+          slot:      { type: string }
+          slotState: { values: [unconsumed, reserved, consumed] }
 
 entities:
 
@@ -49,8 +65,9 @@ entities:
           operativeForce: { derived: "isHighAlert ? 'high' : 'low'" }
         connector: emar
         data:
-          drug: { type: string, required: true }
-          dose: { type: string }
+          drug:  { type: string, required: true }
+          dose:  { type: decimal, required: true }   # numeric so the exact-tolerance clause is typable
+          route: { type: string }
       prescribe:                        # exists so the policy can deny it
         kind: effect
         attributes: { reversibility: irreversible, operativeForce: high }

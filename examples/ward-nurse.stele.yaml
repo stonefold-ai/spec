@@ -30,6 +30,18 @@ gates:
     requireApproval: { when: "data.acuity <= 2", mode: confirm, approvers: role:clinician }
   administer:                                  # effect, irreversible
     precondition: [fiveRightsVerified, notDiscontinued]
+    requireMatch:                              # v0.6: the dose is owed, not merely in-bounds (RFC §7.16)
+      registry: emr.prescriptions
+      match:
+        - "obligation.patientId == resource.patientId"
+        - "obligation.state == 'active'"
+        - "obligation.drug == data.drug"
+        - "obligation.route == data.route"
+        - "obligation.schedule.slotState == 'unconsumed'"
+        - { field: obligation.dose, matches: data.dose, within: 0 }   # exact, stated
+      consume: obligation.schedule.slot
+      onNoMatch: deny
+      resolvers: role:pharmacist               # two active orders -> held, pharmacist paged
     quantityCap:  { per: resource.patientId, limit: 3, window: 24h, of: data.drug }
     requireApproval: { when: "action.operativeForce == high", approvers: role:clinician }
   Order.sign:                                  # transition, operative
