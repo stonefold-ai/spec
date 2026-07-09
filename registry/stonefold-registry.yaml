@@ -14,7 +14,7 @@
 #
 # A transition action MUST declare its legal `from` states (RFC §4.5, §13.3).
 
-connectors: [in_memory, sql, http, email]
+connectors: [in_memory, sql, http, email, erp-po-adapter, emr-prescriptions]
 
 scopePredicates:
   - assignedToCurrentUser
@@ -47,6 +47,37 @@ preconditionChecks:
   - surroundingsClear
   - withinPostedLimit
   - withinTractionLimits
+
+# v0.6 (CS-034, docs/06 §5b): the systems of record `requireMatch` matches
+# against. The schema is a MATCH SURFACE, not a domain model — only the fields
+# the example policies compare and consume are declared.
+obligationRegistries:
+  erp.purchase_orders:                 # payments-ops: the open PO is the obligation
+    connector: erp-po-adapter
+    capability: transactional
+    schema:
+      vendorId: { type: string }
+      state:    { values: [open, closed, cancelled] }
+      vendor:
+        properties:
+          domain: { type: string }
+      line:
+        properties:
+          amount: { type: decimal }
+          state:  { values: [unconsumed, reserved, consumed] }
+  emr.prescriptions:                   # ward-nurse: the prescription is the obligation
+    connector: emr-prescriptions
+    capability: transactional
+    schema:
+      patientId: { type: string }
+      state:     { values: [active, completed, discontinued] }
+      drug:      { type: string }
+      route:     { type: string }
+      dose:      { type: decimal }
+      schedule:
+        properties:
+          slot:      { type: string }
+          slotState: { values: [unconsumed, reserved, consumed] }
 
 sets:
   corporate-domains: [acme.example, acme.test, acme.internal]
