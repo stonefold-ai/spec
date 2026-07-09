@@ -18,7 +18,7 @@ report = run_conformance(MyDriver(), implementation="my-gateway 0.1")
 print(report.render())
 ```
 
-**If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — seventeen small JSON endpoints — start it, and run:
+**If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — twenty-one small JSON endpoints — start it, and run:
 
 ```python
 from stonefold_tck import run_conformance
@@ -36,7 +36,7 @@ Stonefold TCK conformance report -- implementation: my-gateway 0.1
 [core]    CERTIFIED -- 12 pass, 0 fail, 0 skip
 [lint]    CERTIFIED -- 6 pass, 0 fail, 0 skip
 ...
-Certified profiles: core, lint, scope, staging, kill, audit, freshness, batch, digest
+Certified profiles: core, lint, scope, staging, kill, audit, freshness, batch, digest, hold-precondition, feedback, match, consume
 ```
 
 A profile is **certified** only when every one of its checks passed. A check skipped for a missing capability leaves the profile *incomplete* — a skip is never a pass, so a certification claim is always exactly as strong as what actually ran.
@@ -67,13 +67,17 @@ Driver obligations (the contract is `stonefold_tck/driver.py`, one docstring per
 | `submit_batch(actor, session_id, ops)` | Submit one multi-operation SIF batch, decided atomically (`batch` capability, v0.5 CS-023) — reports the batch verdict, the failing operation's index, and the per-operation results |
 | `connector_digest(name)` | The `sha256:<hex>` digest of the artifact currently implementing that connector, computed the way the gateway verifies a registry pin (`digest-pinning` capability, v0.5 CS-020) |
 | `tamper_connector(name)` | Swap the connector's implementation in place, without reloading policy — the supply-chain replacement the pin defends against (`digest-pinning` capability) |
+| `resolve(ticket, resolver_id, gate)` | Credit a resolver identity against ONE named gate's release contract (v0.6 CS-027; `hold-precondition` capability) — distinct from `approve`, which credits the approval-shaped contracts only |
+| `sweep_holds()` | Run the held-row expiry sweep synchronously (v0.6 CS-028; `hold-precondition` capability) — deadline arithmetic MUST run on the injected clock |
+| `seed_obligations(registry, records)` | Load obligation records (ref → typed fields) into the mock adapter behind that declared registry (v0.6; `obligation` capability) — the obligation analogue of `seed` |
+| `set_obligation_outage(registry, active)` | Make the obligation registry's adapter unreachable / restore it (v0.6; `obligation` capability) |
 | `capabilities()` | Which optional obligations you support (missing ⇒ dependent checks SKIP) |
 
 Two capabilities are the v0.4 opt-ins: **`freshness`** declares that decision TTLs + volatile-gate re-validation are wired *with the REQUIRED TCK config* — default TTL **24 hours**, irreversible TTL **30 minutes** (the D5/D6 checks advance the clock against exactly these values, the same way §3 fixes the registered-function semantics); **`scope-reassert`** declares that the scope predicate is re-asserted at dispatch (either declared form — the TCK observes only the shared outcome).
 
 The v0.5 opt-ins follow the same pattern: **`batch`** declares atomic batch decision semantics (CS-023) behind `submit_batch`; **`digest-pinning`** declares connector digest verification at load and at dispatch (CS-020) behind `connector_digest`/`tamper_connector` — the TCK authors the pin itself from the reported digest, so no fixture hard-codes an implementation artifact. For a driver claiming `digest-pinning`, the dispatch-time mismatch settle reason **`connector-digest-mismatch`** is normative, like the v0.4 reasons.
 
-The v0.6 opt-ins (OPEN change set, `RFC-changeset-v0.5-to-v0.6.md`; the profiles below ship with the reference certification of that set): **`hold-precondition`** declares three-valued checks with multi-hold release contracts and active held-row expiry (CS-026/027/028) — the driver gains a resolver-release call and the expiry sweep is steppable like `dispatch_once`; **`feedback`** declares reason codes with retry classes and visibility redaction (CS-029/030); **`obligation`** declares `requireMatch` with the reservation lifecycle (CS-032–CS-036) — the kit ships a **mock obligation-registry adapter** the driver registers, so certification stays black-box and no fixture depends on a real ERP/EMR. For drivers claiming these capabilities the settle/decision reasons `expired-hold:<gate>`, `hold-unresolvable`, `stale-guard:requireMatch`, and the `no-match` refusal are normative, like the v0.4 reasons.
+The v0.6 opt-ins (OPEN change set, `RFC-changeset-v0.5-to-v0.6.md`; the profiles below ship with the reference certification of that set): **`hold-precondition`** declares three-valued checks with multi-hold release contracts and active held-row expiry (CS-026/027/028) — the driver gains a resolver-release call (`resolve`, contract-targeted) and the expiry sweep is steppable like `dispatch_once`; **`feedback`** declares reason codes with retry classes and visibility redaction (CS-029/030) — the driver's submit result additionally carries `reason_code`, `retry_class`, and `agent_view` (the agent-facing payload rendered verbatim, post-redaction, so the kit can assert what did NOT leak); **`obligation`** declares `requireMatch` with the reservation lifecycle (CS-032–CS-036) — the driver registers a **mock obligation-registry adapter** with the kit-specified semantics (§3) behind the fixture's declared registry, so certification stays black-box and no fixture depends on a real ERP/EMR. For drivers claiming these capabilities the settle/decision reasons `expired-hold:<gate>`, `hold-unresolvable`, `stale-guard:requireMatch`, and the `no-match` refusal are normative, like the v0.4 reasons.
 
 Determinism is the design principle: `dispatch_once` steps the worker instead of racing a background thread, and `set_clock` removes wall-time — so every check is reproducible on any implementation.
 
@@ -88,6 +92,9 @@ The fixture pack (`stonefold_tck/fixtures.py`) references five registered names.
 | `tck.rejectMarker` | content hook | BLOCK iff the payload contains the string `BLOCK-ME` |
 | `tck.flagSet` | precondition check | pass iff the resolved target's `flag` is true |
 | `tckSink` | disclosure sink | the only sink a `restricted` read may flow to |
+| `tck.holdOnMarker` | precondition check (v0.6, hold-capable) | HOLD with code `tck-queue` iff the resolved target's `hold` field is truthy; RAISE iff its `crash` field is truthy; else pass. World-driven, like `tck.flagSet` — a resolved question stays resolved at the dispatch-time re-validation |
+| `tck.codelessHold` | precondition check (v0.6, hold-capable) | a CODE-LESS hold iff the target's `badhold` field is truthy; else pass (the gateway must resolve that hold FAIL — CS-026 rule 2) |
+| `tck.orders` | mock obligation-registry adapter (v0.6) | records seeded via `seed_obligations` (ref → typed fields per the fixture's declared schema); `query` filters by the gateway's typed selector; `reserve`/`consume`/`release` idempotent per (ref, intent id); reserving/consuming/releasing moves the record's `line.state` through `reserved`/`consumed`/`unconsumed`, so an `== 'unconsumed'` match clause refuses a spoken-for line at decision time |
 
 The fixture registry ships in the **authoring format** (docs/06) — the spec's format — so every implementation adapts from the same artefact. (The reference driver converts it to its loader dialect in ~30 lines; see `authoring_to_compact`.)
 
@@ -123,7 +130,7 @@ A certification claim therefore reads "certifies TCK profiles X, Y, Z" — never
 
 ## 6. The wire binding (multi-language)
 
-The harness API is the driver contract as seventeen JSON endpoints — the full table with request/response shapes is in `stonefold_tck/http_driver.py`'s module docstring, and `stonefold_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
+The harness API is the driver contract as twenty-one JSON endpoints — the full table with request/response shapes is in `stonefold_tck/http_driver.py`'s module docstring, and `stonefold_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
 
 Rules: the harness is **test builds only**; every endpoint returns 200 with a JSON body; timestamps are ISO-8601; a capability you don't advertise may leave its endpoint unimplemented.
 
