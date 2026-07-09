@@ -114,7 +114,9 @@ satisfied. Schema: optional `resolvers` on `precondition`, `emissionControl`, an
 `timeout` and (b) the row's staging TTL (CS-017) — and expiry is **acted on**, not merely
 implied: the gateway MUST run an expiry sweep over held rows (the dispatch worker's loop
 is sufficient) that settles an expired hold `CANCELLED`/`expired-hold:<gate>`, preserving
-the original hold reason code in the audit record. `onTimeout: deny` (the default)
+the original hold reason code in the audit record. Both deadlines are measured from
+staging, **on the same clock that stamped the staging TTL** (the decision-time clock) —
+anchoring them on different clocks makes the earlier-of comparison meaningless under skew. `onTimeout: deny` (the default)
 cancels; `onTimeout: allow` promotes the row **iff every other release contract is
 satisfied** (CS-027) — it satisfies its own contract only. CS-017's rule is unchanged and
 remains the backstop: a late release cannot resurrect an expired row; the intent must be
@@ -423,6 +425,10 @@ re-opens the races v0.4/v0.5 closed:
   MUST expire orphaned reservations, and the gateway's release path is idempotent so a
   recovery release of an already-expired reservation is a no-op (`NotHeld`). A
   deployment SHOULD run reconciliation (reservations ↔ staged rows) on gateway restart.
+  The reservation TTL runs on the **adapter's** clock, not the gateway's; the gateway
+  MUST tolerate the skew — a lost reservation is caught by the dispatch liveness check,
+  an expired-but-unclaimed one MAY be re-acquired by the same intent at that check, and
+  releasing an adapter-expired reservation is the `NotHeld` no-op.
 - **Batches (CS-023):** reservations for all operations in a batch are taken with the
   batch's atomic staging; any refused operation refuses the batch and releases every
   reservation taken for it.
