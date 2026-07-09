@@ -36,6 +36,14 @@ preconditionChecks:
   - deconflicted
   - positiveIdentification
   - payeeCoolingOffElapsed
+  # v0.6 (CS-026/CS-029): the object form — declares hold capability and the
+  # retry class of every code the check may emit (docs/06 §5).
+  - name: matchesOpenPurchaseOrder
+    holdCapable: true
+    reasonCodes:
+      no-open-match: terminal
+      amount-outside-tolerance: retryable
+      multiple-candidates: escalate
   - surroundingsClear
   - withinPostedLimit
   - withinTractionLimits

@@ -158,10 +158,13 @@ preconditionChecks:
 ```
 
 Built-in gate reasons get normative classes: `valueLimit`, `rate`, `quota`,
-`quantityCap`, `spendLimit`, `window`, `contentCheck` ⇒ `retryable`; `allowlist`,
-`denylist`, `disclosure`, unknown-action, scope refusals ⇒ `terminal`;
-`stale-decision` ⇒ `retryable` (resubmit for a fresh decision); `expired-hold` ⇒
-`escalate`.
+`quantityCap`, `spendLimit`, `window`, `contentCheck`, `requireExplanation` ⇒
+`retryable`; `allowlist`, `denylist`, `disclosure`, unknown-action, scope
+refusals ⇒ `terminal`; `stale-decision` and `stale-guard:<gate>` ⇒ `retryable`
+(resubmit for a fresh decision); `expired-hold` ⇒ `escalate`;
+`hold-unresolvable` ⇒ `escalate` (a configuration error a human must fix). An
+approval-shaped hold with no check code carries no class — the agent's move
+there is to wait, which none of the three classes means.
 
 **Why:** the local agentic loop converges because a compiler error is specific and
 in-principle fixable by editing. A gateway deny is not always: "amount outside
