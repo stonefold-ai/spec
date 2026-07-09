@@ -1,15 +1,15 @@
-# Stele — Specification v0.6 (draft)
+# Stele — Specification v0.6
 
 *The policy language for the SIF gateway: the declarative file that decides, deterministically, what an AI agent is permitted to do, and what is recorded when it tries.*
 
 > **Layering.** Stele is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). Stele references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; Stele = *what is allowed*; the v0.6 `requireMatch` gate adds the third clause — *what is owed* (§7.16).
 
-**Status:** Draft v0.6 — change set v0.5 → v0.6 **OPEN** ([`docs/RFC-changeset-v0.5-to-v0.6.md`](RFC-changeset-v0.5-to-v0.6.md)); its items (CS-026…CS-039) are mirrored below and are normative for implementers of this draft; the version closes to v0.6 when the set is accepted (reference implemented, TCK profiles certified). The last **closed** version is v0.5. **Authors:** the agent-platform team.
+**Status:** v0.6 — change set v0.5 → v0.6 **ACCEPTED** 2026-07-09 ([`docs/RFC-changeset-v0.5-to-v0.6.md`](RFC-changeset-v0.5-to-v0.6.md)): the reference implements every item (CS-026…CS-039) and the TCK certifies the four new profiles (`hold-precondition`, `feedback`, `match`, `consume`), in-process and over the wire binding. **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.6 is **additive**: no existing key changes meaning, and existing `apiVersion: stele/v0.1` policy files remain valid as-is. It contains **one deliberate, argued amendment to the frozen shape** — the gate catalog grows from fourteen to fifteen (`requireMatch`, CS-032) — and deliberately does **not** touch the condition grammar (§8): the tolerance comparison is a structured gate field (CS-033), not a new operator. `schema/stele.schema.json` gains optional keys only. Three behavioural deltas an upgrading deployment sees (all intended): the agent-facing feedback default becomes `code+fields` (CS-030), held rows expire actively (CS-028), and duplicate holds collapse (CS-031). v0.5 was additive declarations, semantic completions, and text fixes (digest pins CS-020, batch semantics CS-023, classification order CS-024). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`; v0.4 → v0.5 is `docs/RFC-changeset-v0.4-to-v0.5.md`; v0.5 → v0.6 is `docs/RFC-changeset-v0.5-to-v0.6.md` (OPEN).
+> **Compatibility:** v0.6 is **additive**: no existing key changes meaning, and existing `apiVersion: stele/v0.1` policy files remain valid as-is. It contains **one deliberate, argued amendment to the frozen shape** — the gate catalog grows from fourteen to fifteen (`requireMatch`, CS-032) — and deliberately does **not** touch the condition grammar (§8): the tolerance comparison is a structured gate field (CS-033), not a new operator. `schema/stele.schema.json` gains optional keys only. Three behavioural deltas an upgrading deployment sees (all intended): the agent-facing feedback default becomes `code+fields` (CS-030), held rows expire actively (CS-028), and duplicate holds collapse (CS-031). v0.5 was additive declarations, semantic completions, and text fixes (digest pins CS-020, batch semantics CS-023, classification order CS-024). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`; v0.4 → v0.5 is `docs/RFC-changeset-v0.4-to-v0.5.md`; v0.5 → v0.6 is `docs/RFC-changeset-v0.5-to-v0.6.md`.
 
-## Changelog — v0.5 → v0.6 (OPEN)
+## Changelog — v0.5 → v0.6
 
 | ID | Type | §  | Summary |
 |----|------|----|---------|

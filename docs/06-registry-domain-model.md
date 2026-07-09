@@ -2,7 +2,7 @@
 
 *The registry is where a domain is **declared**: its entities, their properties, the actions you can take on them (each with a **kind** and governance **attributes**), lifecycle states, value sets, and the connectors/predicates the gateway uses. SIF draws the agent's vocabulary from it; Stele reads attributes from it; the gateway validates every intent against it.*
 
-**Status:** Draft v1.2 (alongside Stele's OPEN v0.5 → v0.6 change set). **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); Stele ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
+**Status:** v1.2 (alongside Stele v0.6). **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); Stele ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
 
 > **Changelog v1.1 → v1.2** (alongside Stele v0.6, `RFC-changeset-v0.5-to-v0.6.md`): **obligation registries** added — a new declaration class backing the `requireMatch` gate (Stele §7.16), with a typed schema, CS-020 digest pinning, a declared consistency capability, and the four-operation adapter contract (§5b, Stele CS-034); **precondition-check declarations gain an object form** — `name` + `holdCapable` + `reasonCodes` with retry classes (§5, Stele CS-026/CS-029; the bare-name form stays valid); the registered-functions reference updated for the three-valued check result (§6).
 

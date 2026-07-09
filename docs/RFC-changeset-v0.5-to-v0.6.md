@@ -1,10 +1,12 @@
-# RFC Change Set — v0.5 → v0.6 (OPEN)
+# RFC Change Set — v0.5 → v0.6 (ACCEPTED)
 
-**Status: OPEN — the current draft set.** Items CS-026 through CS-039 are mirrored in the
+**Status: ACCEPTED 2026-07-09.** Items CS-026 through CS-039 are mirrored in the
 `docs/01` changelog and the RFC body text; on any conflict with older wording, a Change
-Set wins (same rule as prior sets). The set is accepted, and the RFC header version
-closes to v0.6, when the reference implements every item and the TCK certifies the new
-profiles.
+Set wins (same rule as prior sets). The acceptance conditions were met the same day the
+set closed: the reference implements every item, and the TCK certifies the four new
+profiles (`hold-precondition`, `feedback`, `match`, `consume`) in-process and over the
+wire binding. The per-principal open-hold budget (CS-031's second half) is deferred to
+v0.6.1.
 
 **Scope of the change.** This set adds the third clause of the layering. SIF says *what
 can be said*; Stele says *what is allowed*; v0.6 adds *what is owed*: a `requireMatch`
