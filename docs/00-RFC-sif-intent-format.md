@@ -20,6 +20,8 @@ Two consequences follow, and they are the whole point:
 
 SIF defines the *shape* of intent. Whether a given intent is *permitted* is the job of Stele (the policy layer); whether it is *correct* is the job of the agent. SIF is containment of *form and reach*, not of judgement.
 
+> **Why adopt this instead of keeping plain tools?** The non-normative case for the whole gateway — written for an adopter whose tools already work, including when not to adopt and what SIF itself costs — is [`docs/21-why-not-just-tools.md`](https://github.com/stonefold-ai/stonefold/blob/main/docs/21-why-not-just-tools.md) in the reference repo.
+
 ---
 
 ## 2. The five action kinds (canonical definition)
