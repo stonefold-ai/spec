@@ -8,7 +8,7 @@ The TCK (`src/stonefold_tck/` in the [reference repo](https://github.com/stonefo
 
 ## 1. How to certify a new gateway (the short version)
 
-**If your gateway is Python:** implement the `stonefold_tck.driver.ConformanceDriver` protocol (≈200 lines of test-only glue — `stonefold_tck/adapters/reference.py` is the worked example) and run:
+**If your gateway is Python:** implement the `stonefold_tck.driver.ConformanceDriver` protocol (a few hundred lines of test-only glue — `stonefold_tck/adapters/reference.py` is the worked example, including its fixture-dialect converter and the required mocks) and run:
 
 ```python
 from stonefold_tck import run_conformance
@@ -33,8 +33,8 @@ Either way the output is the same report:
 
 ```
 Stonefold TCK conformance report -- implementation: my-gateway 0.1
-[core]    CERTIFIED -- 12 pass, 0 fail, 0 skip
-[lint]    CERTIFIED -- 6 pass, 0 fail, 0 skip
+[core]    CERTIFIED -- 13 pass, 0 fail, 0 skip
+[lint]    CERTIFIED -- 7 pass, 0 fail, 0 skip
 ...
 Certified profiles: core, lint, scope, staging, kill, audit, freshness, batch, digest, hold-precondition, feedback, match, consume
 ```
@@ -55,7 +55,7 @@ Driver obligations (the contract is `stonefold_tck/driver.py`, one docstring per
 |---|---|
 | `load(registry_yaml, policy_yaml)` | (Re)configure with these fixtures; **reset all state**; refuse invalid policies (`ok=False`) |
 | `set_clock(now)` | Pin the injected clock every time-based gate reads (the RFC already mandates an injected clock) |
-| `seed(resource, rows)` | Load rows into the store behind that entity's connector |
+| `seed(resource, rows)` | Load rows into the store behind that entity's connector, **replacing** any rows previously seeded for that resource — re-seeding is how the TCK moves the world (B4's tenant reassignment, J3's resolved question); an appending driver fails those checks |
 | `submit(actor, session_id, op)` | Submit one operation; **identity comes from this call, never the payload** (invariant 3) |
 | `approve/reject(ticket, approver)` | Resolve a held action; `False` when refused (e.g. self-approval) |
 | `dispatch_once()` | Run the staged-effect worker **synchronously to completion** |
@@ -77,7 +77,7 @@ Two capabilities are the v0.4 opt-ins: **`freshness`** declares that decision TT
 
 The v0.5 opt-ins follow the same pattern: **`batch`** declares atomic batch decision semantics (CS-023) behind `submit_batch`; **`digest-pinning`** declares connector digest verification at load and at dispatch (CS-020) behind `connector_digest`/`tamper_connector` — the TCK authors the pin itself from the reported digest, so no fixture hard-codes an implementation artifact. For a driver claiming `digest-pinning`, the dispatch-time mismatch settle reason **`connector-digest-mismatch`** is normative, like the v0.4 reasons.
 
-The v0.6 opt-ins (`RFC-changeset-v0.5-to-v0.6.md`, ACCEPTED; the profiles shipped with the reference certification of that set): **`hold-precondition`** declares three-valued checks with multi-hold release contracts, active held-row expiry, and hold dedupe (CS-026/027/028/031) — the driver gains a resolver-release call (`resolve`, contract-targeted), the expiry sweep is steppable like `dispatch_once`, and the REQUIRED TCK dedupe window is **one hour** (fixture semantics, like the freshness TTLs); **`feedback`** declares reason codes with retry classes and visibility redaction (CS-029/030) — the driver's submit result additionally carries `reason_code`, `retry_class`, and `agent_view` (the agent-facing payload rendered verbatim, post-redaction, so the kit can assert what did NOT leak); **`obligation`** declares `requireMatch` with the reservation lifecycle (CS-032–CS-036) — the driver registers a **mock obligation-registry adapter** with the kit-specified semantics (§3) behind the fixture's declared registry, so certification stays black-box and no fixture depends on a real ERP/EMR. For drivers claiming these capabilities the settle/decision reasons `expired-hold:<gate>`, `hold-unresolvable`, `stale-guard:requireMatch`, and the `no-match` refusal are normative, like the v0.4 reasons.
+The v0.6 opt-ins (`RFC-changeset-v0.5-to-v0.6.md`, ACCEPTED; the profiles shipped with the reference certification of that set): **`hold-precondition`** declares three-valued checks with multi-hold release contracts, active held-row expiry, and hold dedupe (CS-026/027/028/031) — the driver gains a resolver-release call (`resolve`, contract-targeted), the expiry sweep is steppable like `dispatch_once`, and the REQUIRED TCK config (fixture semantics, like the freshness TTLs) is: dedupe window **one hour**, and **no deployment default resolver role** — so a gate naming no `resolvers:` has an unsatisfiable release contract, which is what J7 refuses fail-closed; **`feedback`** declares reason codes with retry classes and visibility redaction (CS-029/030) — the driver's submit result additionally carries `reason_code`, `retry_class`, and `agent_view` (the agent-facing payload rendered verbatim, post-redaction, so the kit can assert what did NOT leak); **`obligation`** declares `requireMatch` with the reservation lifecycle (CS-032–CS-036) — the driver registers a **mock obligation-registry adapter** with the kit-specified semantics (§3) behind the fixture's declared registry, so certification stays black-box and no fixture depends on a real ERP/EMR. For drivers claiming these capabilities the settle/decision reasons `expired-hold:<gate>`, `hold-unresolvable`, `stale-guard:requireMatch`, and the `no-match` refusal are normative, like the v0.4 reasons.
 
 Determinism is the design principle: `dispatch_once` steps the worker instead of racing a background thread, and `set_clock` removes wall-time — so every check is reproducible on any implementation.
 
@@ -98,12 +98,14 @@ The fixture pack (`stonefold_tck/fixtures.py`) references five registered names.
 
 The fixture registry ships in the **authoring format** (docs/06) — the spec's format — so every implementation adapts from the same artefact. (The reference driver converts it to its loader dialect in ~30 lines; see `authoring_to_compact`.)
 
+Two fixture conventions the driver must map, both from docs/06 §4's implicit actions: the TCK submits the implicit observe under the name **`read`** (or with `action` omitted — the two are equivalent) and the implicit record under **`create`**; the fixture registry does not declare either, because declaring an entity is what makes it readable/writable.
+
 ## 4. Profiles and what they prove
 
 | Profile | Checks | Proves |
 |---|---|---|
 | `core` | A1–A3, C1–C10 | default deny, deny-wins, gate AND-combination; valueLimit, rate, allow/denylist, from-states, quantityCap, disclosure (sinks + the CS-024 classification order, fail-closed outside the declared order), contentCheck, fail-closed conditions, named preconditions |
-| `lint` | A4–A8 | invalid policies refuse to load (open-on-irreversible, unknown names incl. `deny`, standing∩deny, dual-auth quorum); warnings surfaced |
+| `lint` | A4–A9 | invalid policies refuse to load (open-on-irreversible, unknown names incl. `deny`, standing∩deny, dual-auth quorum, hold-capable checks declared without reason codes); warnings surfaced |
 | `scope` | B1–B3 | scope injected below the model; effects on out-of-scope targets denied pre-dispatch; payloads cannot widen scope |
 | `staging` | D1–D4 | effects staged by default and dispatched exactly once (idempotent); approvals hold/release/reject; dual-auth needs two distinct non-actor identities; failed irreversibles stage their declared compensation |
 | `kill` | E1, E2s, E6 | session/agent/action-class kills → HALT; kill before the dispatch step cancels; a committed effect is never claimed reversed; lifting restores |
@@ -111,10 +113,10 @@ The fixture registry ships in the **authoring format** (docs/06) — the spec's 
 | `freshness` | D5, D5b, D6, D6b, D6c, B4 | v0.4 (CS-017/018): an expired decision cancels at claim (`stale-decision`) and a late approval cannot resurrect it; a denylist update between decision and dispatch cancels (`stale-guard:denylist`); counters and approval grants are NOT re-run; a target reassigned after the decision never receives the effect (`scope-lost`) |
 | `batch` | H1–H4 | v0.5 (CS-023): any DENY/HALT refuses the whole batch before anything commits or stages, naming the failing operation; a HOLD stages without refusing (record ops commit atomically with the staging); a later rejection does not roll committed ops back |
 | `digest` | I1–I3 | v0.5 (CS-020): a pinned digest mismatch fails closed at policy load; a post-decision implementation swap cancels the staged effect at dispatch, audited `connector-digest-mismatch`; a matching pin dispatches normally |
-| `hold-precondition` | J1–J6 | v0.6 (CS-026/027/028/031; J6 sharpened by CS-040, v0.6.1 OPEN): a hold-capable check's hold stages the intent with its reason code; a code-less hold resolves fail; a precondition-hold composed with an approval requires **both** contracts (the resolver alone cannot release it — the approval-bypass regression); an expired hold settles `expired-hold:<gate>` preserving the code, on the injected clock that anchored the staging TTL; outage ⇒ fail, never hold; duplicate holds collapse into one queue item (same ticket, attempt counted, each attempt audited) — and DISTINCT questions (a different target, different compared intent values) do **not** collapse |
+| `hold-precondition` | J1–J7 | v0.6 (CS-026/027/028/031; J6 sharpened by CS-040, v0.6.1 OPEN): a hold-capable check's hold stages the intent with its reason code and declared retry class; a code-less hold resolves fail; a precondition-hold composed with an approval requires **both** contracts (the resolver alone cannot release it — the approval-bypass regression); an expired hold settles `expired-hold:<gate>` on the injected clock that anchored the staging TTL, and a late release cannot resurrect it; outage ⇒ fail, never hold; duplicate holds collapse into one queue item (same ticket, attempt counted, each attempt audited) — and a DISTINCT question (a different target, hence different gate evidence) does **not** collapse; a hold with no resolvable release contract refuses fail-closed `hold-unresolvable`, never staged |
 | `feedback` | K1–K3 | v0.6 (CS-029/030): deny/hold results carry code + retry class; `code+fields` never leaks record-side values; the audit record is unaffected by redaction |
 | `match` | L1–L5 | v0.6 (CS-032/033/036): exactly-one ⇒ pass; zero ⇒ `onNoMatch`; several ⇒ `onAmbiguous` hold, never a pick; a forged obligation copy in `data.*` changes nothing (pointer narrows, never substitutes); tolerance honoured; registry unreachable ⇒ fail-closed for irreversibles |
-| `consume` | M1–M4 | v0.6 (CS-035): reservation taken with staging (second intent against the line ⇒ `no-match`); consume lands with the settle; cancel/kill/expiry releases the line for resubmission; retries never double-consume |
+| `consume` | M1–M5 | v0.6 (CS-035): reservation taken with staging (second intent against the line ⇒ `no-match`); consume lands with the settle; cancel/kill/expiry releases the line for resubmission; retries never double-consume; a reservation lost to another intent (adapter orphan-expiry, F5.2) cancels at claim with `stale-guard:requireMatch` — never a double payment |
 
 ## 5. What the TCK deliberately does NOT test (and why)
 
@@ -125,6 +127,7 @@ Honesty is the product's brand; it is also the kit's. Three RFC guarantees are n
 3. **Multi-instance kill propagation (E3, CS-007)** and **dependency-failure modes (C7/E5/F3)** need infrastructure control the kit doesn't assume. Capability hooks may add these later.
 4. **The declared residual window in the audit record (B5's second clause, CS-018).** The TCK's normalized audit shape doesn't carry `scopeApplied`, so which reassertion *form* ran is not asserted black-box; both forms are covered through their shared observable (the effect does not land, settle reason `scope-lost`). Keep a window-declaration test in your own suite (the reference does — `test_v04_scope_norace.py`).
 5. **Transactional consumption atomicity (v0.6, CS-035).** Whether `consume` shares the effect's commit transaction on a `transactional` registry is, like F2, a crash-consistency property inside your process. The `consume` profile asserts the observable consequence (an injected dispatch failure leaves the line unconsumed — no consumed-without-effect); keep a fault-injection test for the shared transaction in your own suite.
+6. **The preserved hold reason code on an expiry settle (v0.6, CS-028's second clause).** The TCK's normalized audit shape carries the settle *reason* (`expired-hold:<gate>`, asserted by J4) but no reason-*code* field, so "original hold reason code preserved" is not asserted black-box. Keep a code-preservation test in your own suite (the reference does — `tests/test_v06_hold_substrate.py`).
 
 A certification claim therefore reads "certifies TCK profiles X, Y, Z" — never "proves the RFC".
 
