@@ -44,4 +44,5 @@ governance is on the table — from strength, not ahead of adoption.
 
 ## License
 
-Apache-2.0 (see `LICENSE`).
+Apache-2.0 (see `LICENSE`). Anyone may implement this specification; no further
+permission is needed. Provided as is, without warranty of any kind.

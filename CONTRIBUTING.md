@@ -107,8 +107,18 @@ project.
 
 ## License
 
-Apache-2.0. By contributing you agree your contribution is licensed under the same terms
-(Apache-2.0 §5).
+Apache-2.0. By contributing you agree that:
+
+- your contribution is licensed under Apache-2.0 (§5);
+- you certify the [Developer Certificate of Origin](https://developercertificate.org/)
+  and sign each commit with `Signed-off-by` (`git commit -s`);
+- you grant the maintainer the right to distribute future versions of the specifications,
+  including your contribution, under other license terms.
+
+That last point keeps the project's licensing options open without needing to track down
+every past contributor. It does not change the terms of anything already released: every
+version published under Apache-2.0 stays Apache-2.0 forever, and the right to implement
+the specifications is unconditional (see the README).
 
 ## What to expect from the maintainer
 
