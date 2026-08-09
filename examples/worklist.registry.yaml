@@ -1,0 +1,58 @@
+apiVersion: registry/v0.1
+domain: worklist
+# Domain model for the worklist estate. Pairs with worklist.stele.yaml.
+# Declares closure (docs/06 §5c) and per-item fan-out (docs/06 §5d) on the closing
+# action; the deny'd deleteItem is declared so the policy's deny resolves (§13 rule 1).
+
+connectors:
+  worklist-sql: { type: sql }
+
+scopePredicates: [ assignedToQueue ]
+
+entities:
+
+  WorklistItem:
+    label: "An item on a results worklist"
+    dataSource: worklist-sql
+    table: worklist_items
+    properties:
+      queue:  { type: string }
+      status: { values: [unreviewed, reviewed] }
+    actions:
+      markWorked:
+        kind: record
+        data:
+          itemIds:     { type: array, required: true }
+          disposition: { values: [resolved, escalated, referred, duplicate], required: true }
+        closure:
+          dispositionField: disposition
+          claimsCompletion: [resolved]    # the only value that says "done"
+        items:
+          field: itemIds                  # bulk calls fan out per item
+          independent: true
+          maxItems: 200
+      deleteItem:
+        kind: effect
+        attributes: { reversibility: irreversible }
+
+  Document:
+    label: "A source document attached to an item"
+    dataSource: worklist-sql
+    table: documents
+    properties:
+      itemId: { type: string }
+
+  Patient:
+    label: "The patient a result belongs to"
+    dataSource: worklist-sql
+    table: patients
+    properties:
+      name: { type: string }
+
+  Note:
+    label: "A working note on an item"
+    dataSource: worklist-sql
+    table: notes
+    properties:
+      itemId: { type: string }
+      text:   { type: string }

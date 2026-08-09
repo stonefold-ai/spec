@@ -1,0 +1,33 @@
+apiVersion: stele/v0.1
+# Tested estate: platform operations (spec §14.2). The agent holds no credentials
+# of its own; the gateway holds them all and is the agent's only network route.
+# The approvals sit on the enabling changes, not on the destructive acts they unlock.
+agent: platform-ops-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Alert, Service, Resource, Deployment]
+  - effect:     [deployRelease, restartService, scaleService, deleteResource,
+                 clearDeletionProtection, readSecret, createAccessGrant]
+  - transition: { Deployment: [promote, rollBack] }
+deny:
+  - effect:     [runShell]
+
+scope:
+  Resource:   inEnvironment(actor.environment)
+  Deployment: inEnvironment(actor.environment)
+
+gates:
+  deleteResource:
+    precondition: [theResourceIsKnownToBeUnused]
+  clearDeletionProtection:                # the enabling change
+    requireApproval: { approvers: role:platform-lead, timeout: 4h, onTimeout: deny }
+  readSecret:
+    denylist: { field: data.secretClass, set: static-provider-keys }
+  createAccessGrant:
+    requireApproval:
+      when: "not exists data.expiry"      # standing access needs a human
+      approvers: role:platform-lead
+  Deployment.rollBack:
+    precondition: { from: [promoted] }

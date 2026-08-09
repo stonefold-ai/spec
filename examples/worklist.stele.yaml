@@ -1,0 +1,22 @@
+apiVersion: stele/v0.1
+# Tested estate: a results worklist (spec §14.3). Reading, ranking and drafting are
+# ungated; the control sits on the closing action. Pairs with worklist.registry.yaml,
+# which declares what closing means (closure, §5c) and per-item fan-out (items, §5d).
+agent: worklist-assistant
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe: [WorklistItem, Document, Patient]
+  - record:  [WorklistItem, Note]
+deny:
+  - effect:  [deleteItem]
+
+scope:
+  WorklistItem: assignedToQueue(actor.queue)
+
+gates:
+  markWorked:
+    precondition:
+      checks: [dispositionIsDeclared]     # the standard check, spec §7.6
+      resolvers: role:supervisor
