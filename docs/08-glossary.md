@@ -78,6 +78,8 @@ Deterministic conditions attached to actions in the policy. Each: what it checks
 Named code the registry declares and the gateway invokes. Full reference with signatures in `06` §6; in brief:
 
 - **scope predicate** — limits *which records* an actor may touch. *In:* actor → *out:* a filter / authz. *Ex:* `tenantOf(actor)` → `WHERE tenant_id = …`.
+- **standard check** *(v0.6.1)* — a precondition check whose name is reserved and whose semantics are normative, so a reviewer reads the behaviour from the spec rather than from the integrator's code. One exists: `dispositionIsDeclared`. *(Stele `01` §7.6.)*
+- **disposition** *(v0.6.1)* — the declared outcome an actor states when it closes a unit of work: resolved, escalated, referred, duplicate. Declared per action in the registry (`closure`, docs/06 §5c); the subset that asserts the work was *done* is `claimsCompletion`. *Ex:* an agent may close a worklist item as `escalated` after the gateway refused its attempt to act, but not as `resolved`.
 - **precondition check** — a deterministic test before an action. *In:* context → *out:* pass/fail — or hold, if declared `holdCapable` (v0.6). *Ex:* `payeeCoolingOffElapsed`.
 - **content hook** — inspects the *payload* of an action. *In:* content → *out:* pass/block. *Ex:* `dlp.basic`.
 - **disclosure sink** — a named destination a read's result may flow to. *Ex:* `careTeam`.

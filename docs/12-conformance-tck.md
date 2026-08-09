@@ -61,7 +61,7 @@ Driver obligations (the contract is `stonefold_tck/driver.py`, one docstring per
 | `dispatch_once()` | Run the staged-effect worker **synchronously to completion** |
 | `effects()` | Every effect that actually left the gateway, in order |
 | `kill(...)/lift(id)` | Issue/lift kill orders (global/agent/session/action_class) |
-| `audit()` | The decision log since `load` (decision, resource, action, outcome, reason) — `reason` is the deciding rule/settle reason; the v0.4 reasons (`stale-decision`, `stale-guard:<gate>`, `scope-lost`) are normative and MUST be populated by drivers claiming the v0.4 capabilities |
+| `audit()` | The decision log since `load` (decision, resource, action, outcome, reason, reasonCode) — `reason` is the deciding rule/settle reason; the v0.4 reasons (`stale-decision`, `stale-guard:<gate>`, `scope-lost`) are normative and MUST be populated by drivers claiming the v0.4 capabilities, and `reasonCode` (v0.6.1) MUST be populated wherever a profile's codes are normative, so a check can assert that the *record* says why and not only the returned verdict |
 | `inject_dispatch_failure(action)` | Make the next dispatch of that action fail at the connector |
 | `update_named_set(name, values)` | Replace a registry named set's values at runtime — a sanctions update landing between decision and dispatch (`freshness` capability) |
 | `submit_batch(actor, session_id, ops)` | Submit one multi-operation SIF batch, decided atomically (`batch` capability, v0.5 CS-023) — reports the batch verdict, the failing operation's index, and the per-operation results |
@@ -72,6 +72,14 @@ Driver obligations (the contract is `stonefold_tck/driver.py`, one docstring per
 | `seed_obligations(registry, records)` | Load obligation records (ref → typed fields) into the mock adapter behind that declared registry (v0.6; `obligation` capability) — the obligation analogue of `seed` |
 | `set_obligation_outage(registry, active)` | Make the obligation registry's adapter unreachable / restore it (v0.6; `obligation` capability) |
 | `capabilities()` | Which optional obligations you support (missing ⇒ dependent checks SKIP) |
+
+One capability is the v0.6.1 opt-in: **`closure`** declares the standard
+`dispositionIsDeclared` check (Stele §7.6) and a registry that can declare an action's
+`closure` (docs/06 §5c). A driver claiming it MUST supply the gateway's **own** decision
+history for the run — what it refused earlier for the same actor and correlation id, read
+from its own audit and from nothing else. The reason codes `DISPOSITION_REQUIRED` and
+`CLOSED_WITHOUT_THE_WORK` are normative for drivers claiming it, in the returned verdict
+and in the audit record.
 
 Two capabilities are the v0.4 opt-ins: **`freshness`** declares that decision TTLs + volatile-gate re-validation are wired *with the REQUIRED TCK config* — default TTL **24 hours**, irreversible TTL **30 minutes** (the D5/D6 checks advance the clock against exactly these values, the same way §3 fixes the registered-function semantics); **`scope-reassert`** declares that the scope predicate is re-asserted at dispatch (either declared form — the TCK observes only the shared outcome).
 
@@ -114,6 +122,7 @@ Two fixture conventions the driver must map, both from docs/06 §4's implicit ac
 | `batch` | H1–H4 | v0.5 (CS-023): any DENY/HALT refuses the whole batch before anything commits or stages, naming the failing operation; a HOLD stages without refusing (record ops commit atomically with the staging); a later rejection does not roll committed ops back |
 | `digest` | I1–I3 | v0.5 (CS-020): a pinned digest mismatch fails closed at policy load; a post-decision implementation swap cancels the staged effect at dispatch, audited `connector-digest-mismatch`; a matching pin dispatches normally |
 | `hold-precondition` | J1–J7 | v0.6 (CS-026/027/028/031; J6 sharpened by CS-040, v0.6.1 OPEN): a hold-capable check's hold stages the intent with its reason code and declared retry class; a code-less hold resolves fail; a precondition-hold composed with an approval requires **both** contracts (the resolver alone cannot release it — the approval-bypass regression); an expired hold settles `expired-hold:<gate>` on the injected clock that anchored the staging TTL, and a late release cannot resurrect it; outage ⇒ fail, never hold; duplicate holds collapse into one queue item (same ticket, attempt counted, each attempt audited) — and a DISTINCT question (a different target, hence different gate evidence) does **not** collapse; a hold with no resolvable release contract refuses fail-closed `hold-unresolvable`, never staged |
+| `closure` | N1–N4 | v0.6.1 (CS-041): a closure with no declared disposition holds `DISPOSITION_REQUIRED`; a closure claiming completion after this gateway refused the same actor in the same run holds `CLOSED_WITHOUT_THE_WORK` and names the refused actions; an honest non-completion disposition passes; `dispositionIsDeclared` on an action with no declared `closure` fails closed rather than passing |
 | `feedback` | K1–K3 | v0.6 (CS-029/030): deny/hold results carry code + retry class; `code+fields` never leaks record-side values; the audit record is unaffected by redaction |
 | `match` | L1–L5 | v0.6 (CS-032/033/036): exactly-one ⇒ pass; zero ⇒ `onNoMatch`; several ⇒ `onAmbiguous` hold, never a pick; a forged obligation copy in `data.*` changes nothing (pointer narrows, never substitutes); tolerance honoured; registry unreachable ⇒ fail-closed for irreversibles |
 | `consume` | M1–M5 | v0.6 (CS-035): reservation taken with staging (second intent against the line ⇒ `no-match`); consume lands with the settle; cancel/kill/expiry releases the line for resubmission; retries never double-consume; a reservation lost to another intent (adapter orphan-expiry, F5.2) cancels at claim with `stale-guard:requireMatch` — never a double payment |

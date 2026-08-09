@@ -142,6 +142,45 @@ These names are exactly what a policy or an action references (`scope: { Payment
 
 ---
 
+## 5c. Closure dispositions (v1.3 — Stele CS-041)
+
+An action that **closes a unit of work** — a worklist item marked reviewed, a ticket
+closed, an alert acknowledged, a document marked worked — MAY declare what closing it
+means. Two fields, on the action:
+
+```yaml
+Document:
+  actions:
+    markWorked:
+      kind: record
+      label: Close a document as worked.
+      data:
+        disposition:
+          values: [resolved, escalated, referred, duplicate]
+          required: true
+      closure:
+        dispositionField: disposition     # which data field carries the disposition
+        claimsCompletion: [resolved]      # the values that assert the work was DONE
+```
+
+`dispositionField` MUST name a field the action declares in `data`, and the declared
+vocabulary is that field's `values`. `claimsCompletion` MUST be a subset of it, and SHOULD
+be a strict subset: if every disposition claims completion there is no honest way to close
+an item the actor could not handle, which is the situation the declaration exists to
+remove.
+
+The declaration is inert on its own. What reads it is the standard check
+`dispositionIsDeclared` (Stele §7.6), named as a `precondition` on the same action, and the
+linter warns about a `closure` no policy enforces (Stele §13.20).
+
+**Why declare it here rather than in the policy.** The vocabulary is a property of the
+managed system — these are the outcomes that system can record — so it belongs with the
+action, reviewed alongside it, and one declaration serves every policy that governs the
+action. Which dispositions *claim the work was done* is the judgment call in the
+declaration, and it is exactly the kind of call §6's review is for.
+
+---
+
 ## 5b. Obligation registries (v1.2 — Stele CS-034)
 
 An **obligation registry** declares a system of record the `requireMatch` gate (Stele §7.16) matches intents against: open purchase orders, active prescriptions, open support cases. Stonefold never stores, owns, or edits obligations — the declaration names the source, types its fields, and states its consistency guarantee; the gateway matches against it and consumes from it (Stele §12, CS-035).

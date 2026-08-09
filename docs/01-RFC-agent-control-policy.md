@@ -15,6 +15,9 @@
 |----|------|----|---------|
 | CS-040 | FIXED | §12 | **Hold dedupe identity sharpened.** The CS-031 identity gains, per holding gate, the gate's evidence (carrying the matched-candidate refs) and the values of the intent fields it compared (its §11 `fields` set). Fixes the zero-candidate over-collapse: two DIFFERENT unmatched intents no longer share a queue item; ten resubmissions of the same one still do. Over-distinguishing degrades safely; over-collapsing loses a question. |
 
+| CS-041 | ADDED | §7.6, §13.20 | **Closure accountability.** An action that closes a unit of work MAY declare a `closure` block (which data field carries the disposition, and which dispositions assert the work was *done*), and the spec defines its first **standard check**, `dispositionIsDeclared`: a closure with no declared disposition holds `DISPOSITION_REQUIRED`; a closure claiming completion while this gateway holds a refusal for the same actor in the same run holds `CLOSED_WITHOUT_THE_WORK`. A disposition outside `claimsCompletion` always passes — the actor keeps a way to be honest. No new gate, no new kind. |
+| CS-042 | ADDED | §13.19 | **Lint: a per-request money threshold with no companion aggregate ⇒ warn.** A `valueLimit`, or a `requireApproval`/`dualAuthorization` whose `when` tests an amount, bounds one request; the same total split across smaller requests slips under it. Advisory: incomplete, not wrong. |
+
 (The per-principal open-hold budget deferred from CS-031 is expected to join this set with deployment evidence.)
 
 ## Changelog — v0.5 → v0.6
@@ -358,6 +361,61 @@ issueRefund:                                # a hold-capable check (CS-026) name
 2. **A hold carries a machine-readable reason code** (§11) or it is invalid: the gateway MUST treat a code-less hold as a check implementation error — resolve `fail`, log loudly. The human resolving the hold must see *why* it paused without reading check code.
 3. **Opt-in per check.** A check declares hold capability in its registry declaration (`holdCapable`, docs/06 §5); two-valued checks remain valid indefinitely.
 
+**Standard checks (v0.6.1).** Almost every check is integrator-registered code, named
+here and implemented there. A **standard check** is different: its name is reserved and
+its semantics are normative, so a policy reviewer reading the name learns the behaviour
+from this document rather than from someone's Python. There is one.
+
+**`dispositionIsDeclared` (CS-041).** For an action that closes a unit of work — a
+worklist item marked reviewed, a ticket closed, an alert acknowledged. The action's
+registry entry declares what closing it means (docs/06 §5c):
+
+```yaml
+Document.markWorked:
+  kind: record
+  data:
+    disposition: { values: [resolved, escalated, referred, duplicate], required: true }
+  closure:
+    dispositionField: disposition       # which data field carries it
+    claimsCompletion: [resolved]        # the values that assert the work was DONE
+```
+
+```yaml
+markWorked:
+  precondition:
+    checks: [dispositionIsDeclared]
+    resolvers: role:supervisor
+```
+
+The check resolves, in order:
+
+1. The action declares no `closure` ⇒ the policy is invalid (§13.20); at runtime,
+   fail-closed under §10.
+2. `data[dispositionField]` is absent, empty, or outside the declared values ⇒ **hold**,
+   `DISPOSITION_REQUIRED`, retry class `retryable`. Nothing was closed and the actor may
+   resubmit with a disposition.
+3. The disposition is in `claimsCompletion` **and** this gateway refused (`deny`, `halt`
+   or `hold`) an intent from this actor earlier in this run ⇒ **hold**,
+   `CLOSED_WITHOUT_THE_WORK`, retry class `escalate`, carrying the refused actions as
+   evidence.
+4. Otherwise ⇒ pass. A disposition *outside* `claimsCompletion` always reaches this rule:
+   the actor keeps a way to say *I looked at this and it is not mine to close*.
+
+What this guarantees is a property of the **record**, not of completeness: *nothing is
+closed as done while this gateway holds a refusal for the same actor in the same run.*
+The gateway cannot know whether work was done — it knows what passed through it, and rule
+3 reads **only its own audit of its own traffic**. It needs no due dates and no knowledge
+of what the item is. An item that never reached the gateway is invisible to it and remains
+the managed system's responsibility.
+
+The check is scoped to the **run**, not the item, because an intent does not cite the item
+it is acting for. So it is exact where a run handles one item and over-broad where a run
+handles forty: a truthful closure can be held because something else in the same run was
+refused. The failure direction is deliberate — a hold on an honest closure, never a silent
+false one — and an honest disposition still passes. A deployment needing per-item
+precision must have the actor cite the item it is closing, which is a change to the
+managed system's API rather than to this spec.
+
 Who may release a precondition hold is the gate's `resolvers:` field, or the deployment's default resolver role — see the release-contract rules in §12 (CS-027). At dispatch-time re-validation (CS-017) nothing changes: `precondition` is volatile, and any non-PASS at the claim — including a fresh `hold` — settles `CANCELLED`/`stale-guard:precondition`; a claimed row is never re-suspended.
 
 ### 7.7 `contentCheck`
@@ -696,6 +754,8 @@ Held rows **expire actively** (CS-028): the gateway MUST sweep held rows (the di
 16. (v0.6, CS-038) `requireMatch` with `consume: none` on an `irreversible` effect ⇒ **warn** (verification without consumption leaves the double-spend window open, §12).
 17. (v0.6, CS-038) `onAmbiguous: allow` ⇒ **error** (illegal value; §7.16 — the gateway never auto-selects among candidate obligations).
 18. (v0.6, CS-038) A check declared `holdCapable: true` with no declared `reasonCodes` ⇒ **error** (every hold it returns would be code-less and resolve fail, §7.6 rule 2); a hold-capable check gated with no `resolvers` and no visible deployment default resolver role ⇒ **warn** (§12, CS-027 — the warning names the deployment fallback).
+19. (v0.6.1, CS-042) A gate that bounds a **single request** by an amount — a `valueLimit`, or a `requireApproval`/`dualAuthorization` whose `when` clause tests an amount — with **no** aggregate gate (`spendLimit`/`rate`/`quota`) on the same action ⇒ **warn**. The same total split across smaller requests evades a per-item threshold; the aggregate is what closes it. Advisory, because a per-item threshold is incomplete rather than wrong and some actions genuinely want no aggregate.
+20. (v0.6.1, CS-041) `dispositionIsDeclared` named as a `precondition` check on an action whose registry entry declares no `closure` ⇒ **error** (the check has nothing to read; §7.6). An action that declares `closure` while no policy rule names `dispositionIsDeclared` on it ⇒ **warn** — a declared disposition vocabulary that nothing enforces is decoration, and the audit will show closures nobody checked.
 
 ---
 

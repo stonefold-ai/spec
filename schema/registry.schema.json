@@ -120,6 +120,16 @@
           }
         },
         "data": { "type": "object", "additionalProperties": { "$ref": "#/$defs/property" } },
+        "closure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dispositionField"],
+          "description": "What closing this action means (docs/06 §5c) — read by the standard `dispositionIsDeclared` check (Stele §7.6, CS-041).",
+          "properties": {
+            "dispositionField": { "type": "string", "description": "The data field carrying the disposition; MUST be declared in this action's `data`, and its `values` are the declared vocabulary." },
+            "claimsCompletion": { "type": "array", "items": { "type": "string" }, "description": "The dispositions that assert the work was DONE. A subset of the field's declared values; SHOULD be a strict subset, so an honest non-completion disposition exists." }
+          }
+        },
         "resolve": { "type": "object", "additionalProperties": { "type": "object", "required": ["entity"], "additionalProperties": true, "properties": { "entity": { "type": "string" } } } },
         "compensation": {
           "description": "Declared in-system undo action (Stele RFC section 13 rule 10 / CS-008). Required when reversibility is 'compensable'; the linter checks the target exists.",
