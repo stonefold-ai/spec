@@ -35,7 +35,7 @@ So: **two schemas you hand-maintain** (registry, Stele). **SIF's real validating
 
 This is the crux. SIF's defining safety property (SIF RFC §4) is **enum injection**: the agent can only name entities, actions, fields, and values the registry declares — invalid names are *unrepresentable*, not merely rejected. A *static* SIF schema could never enforce that, because at the time you'd write it you don't know the domain's names; it would either be too loose ("`entity` is any string") to provide the guarantee, or it would duplicate the registry and drift from it.
 
-So the gateway **reads the registry at startup and generates the `submit_intent` tool schema** with the registry's names baked in as enums. That generated schema is what the agent is actually constrained by. Generating it from the single source of truth (the registry) means it can never disagree with the domain — and when the registry changes, the agent's surface updates automatically, with no second file to edit.
+So the gateway **reads the registry at startup and generates the agent's tool schemas** from it — one per declared action, with the registry's field names and legal values baked in. Those generated schemas are what the agent is actually constrained by. Generating it from the single source of truth (the registry) means it can never disagree with the domain — and when the registry changes, the agent's surface updates automatically, with no second file to edit.
 
 ---
 
@@ -73,7 +73,7 @@ Dependency order to remember: **Registry → SIF (generated) → Stele (referenc
 **(b) Startup / load**
 - The gateway loads the registry and the policy (verifying the signature if signing is enabled).
 - It **compiles the policy** into the authorization matcher.
-- It **generates the SIF tool schema** from the registry (enum-injected) and hands it to the agent as the `submit_intent` tool.
+- It **generates the tool schemas** from the registry (declared actions, fields, legal values) and serves them to the agent, with retrieval over them where the catalogue is large.
 
 **(c) Per request** — for each intent the agent emits, in order:
 1. **L1 — shape.** Validate against the generic `sif.schema.json` (well-formed operations).

@@ -2,7 +2,7 @@
 
 *The format an AI agent uses to express **what it wants done**, in declared domain vocabulary, without ever expressing **how** to do it. SIF is the contract the agent emits; a deterministic layer translates it into action (or refuses it).*
 
-**Status:** Draft v1.0 (reference specification). **Supersedes** the original seven-verb SIF design (see §9). **Authors:** the agent-platform team.
+**Status:** Draft v1.0 (reference specification). **Authors:** the agent-platform team.
 **Layer:** SIF is the lower layer — it defines *what the agent can say*. The **Stele** spec ([`01-RFC-agent-control-policy.md`](01-RFC-agent-control-policy.md)) is the upper layer — it defines *what the agent is allowed to do*. Stele references this document for the action kinds and the intent shape.
 
 ### Conventions
@@ -20,7 +20,7 @@ Two consequences follow, and they are the whole point:
 
 SIF defines the *shape* of intent. Whether a given intent is *permitted* is the job of Stele (the policy layer); whether it is *correct* is the job of the agent. SIF is containment of *form and reach*, not of judgement.
 
-> **Why adopt this instead of keeping plain tools?** The non-normative case for the whole gateway — written for an adopter whose tools already work, including when not to adopt and what SIF itself costs — is [`docs/21-why-not-just-tools.md`](https://github.com/stonefold-ai/stonefold/blob/main/docs/21-why-not-just-tools.md) in the reference repo.
+> **Why adopt this instead of keeping plain tools?** The non-normative case for the whole gateway — written for an adopter whose tools already work, including when not to adopt and what a gateway costs — is [`docs/21-why-not-just-tools.md`](https://github.com/stonefold-ai/stonefold/blob/main/docs/21-why-not-just-tools.md) in the reference repo.
 
 ---
 
@@ -38,7 +38,7 @@ Every SIF operation has exactly one **kind**. The kind is declared per action in
 
 Rules that are part of the format:
 - **`observe` is passive only.** Sensing that *emits* (and is thus detectable / consequential) is an `effect`, not an `observe`. The registry's `emission` attribute decides this; the agent does not.
-- **`record` built-in actions** are `create`, `update`, `delete`, `link`, `unlink`. (These replace the original SIF's standalone verbs.)
+- **`record` built-in actions** are `create`, `update`, `delete`, `link`, `unlink`.
 - **`assess`, `effect`, `transition`** name a **registry-declared action** (e.g. `triage`, `pay`, `sign`).
 - **A `transition` MUST name a declared transition** whose legal `from`-states the registry defines; the gateway refuses a transition from an illegal state.
 - The kind organizes the agent's selection space; it does **not** by itself determine governance weight (that is Stele's concern, via attributes).
@@ -135,14 +135,14 @@ The error is returned to the agent as a tool result so it can **self-correct on 
 ## 7. Transport bindings
 
 SIF is transport-neutral. Two bindings are defined:
-- **SIF-native** — the agent is given a single tool, `submit_intent`, whose schema is generated from the registry (enum-injected names). The agent can emit nothing else; coverage is structural (no other path to act).
+- **The declared surface** — the agent's tools are generated from the registry: one typed tool per declared action, with retrieval over them for a registry too large to place in front of a model at once. A tool exists because an action is declared, so coverage is structural (no other path to act). A client MAY instead post the intent directly to the gateway's intent endpoint; both arrive at the same enforcement.
 - **Interception** — existing tool/MCP calls are mapped to SIF operations by the gateway. Coverage equals what is mapped; an unmapped call MUST be denied.
 
 Transport is otherwise a deployment concern (see the architecture decisions doc).
 
-> **Relation to MCP.** SIF is not a new wire protocol. Concretely, the SIF-native binding is just an **MCP server (or equivalent tool interface) that exposes exactly one tool — `submit_intent` — whose schema is generated from the registry**. The contribution is the *shape* of that surface — a single, registry-typed intent tool with enum-injected names — not the transport: MCP already carries typed tool schemas; SIF narrows the agent to one registry-derived tool instead of many separately-registered ones. The interception binding rides ordinary MCP/tool transport too.
+> **Relation to MCP.** SIF is not a new wire protocol and does not replace one. Both bindings ride ordinary MCP/tool transport: the declared surface is an MCP server whose tools are generated from the registry rather than hand-registered, and interception maps the tool calls an agent already makes onto declared actions. What this format contributes is not the transport and not the number of tools — it is that every call resolves to an action somebody declared, in a vocabulary a policy can be written against, with no raw-substrate verb anywhere in it. A deployment with hundreds of declared actions should serve retrieval over the catalogue rather than the whole of it, because a model choosing among hundreds chooses worse; that is a serving concern, not a change to the format.
 
-> **On the SIF "schema".** The schema the agent is actually validated against is **generated from the registry** at startup (enum-injected names) — it is not a static file, because it must contain this domain's names. A thin static `schema/sif.schema.json` covers only generic L1 shape-checking. How the registry, SIF, and Stele schemas relate and run at runtime is set out in [`07-artifacts-and-schemas.md`](07-artifacts-and-schemas.md).
+> **On the SIF "schema".** The schemas the agent is actually validated against are **generated from the registry** at startup (declared actions, fields and values) — not static files, because they must contain this domain's names. A thin static `schema/sif.schema.json` covers only generic L1 shape-checking. How the registry, SIF, and Stele schemas relate and run at runtime is set out in [`07-artifacts-and-schemas.md`](07-artifacts-and-schemas.md).
 
 ---
 
@@ -157,17 +157,7 @@ A programmatic client MAY emit SIF directly (the LLM agent is just one SIF produ
 
 ---
 
-## 9. What changed from the original SIF design (superseded)
-
-This v1.0 supersedes the original SIF design (the seven-verb, ontology-framed version). Differences:
-- **Seven verbs → five kinds.** `find/create/update/delete/link/unlink/transition` becomes `observe / assess / record / effect / transition`. The CRUD verbs collapse into `record`'s built-in actions; **`assess`** (consequential judgement) is added; **`effect`** generalizes side-effecting actions **beyond data** (mail, devices, payments, emitting sensing).
-- **"Ontology" → "registry / model."** Same idea (typed domain model with states and attributes), plainer name; no reasoning/OWL semantics implied.
-- **Governance attributes and the policy surface moved out** into the Stele spec, leaving SIF focused on the intent format.
-- The intent/execution principle, enum injection, structured recoverable errors, and batch-as-transaction are **retained unchanged in spirit**.
-
----
-
-## 10. Quick reference
+## 9. Quick reference
 
 **Kinds (frozen):** `observe` · `assess` · `record` (create/update/delete/link/unlink) · `effect` · `transition`
 **Operation fields:** `kind` · `entity` · `action` · `data` · `filters` · `resolve` · `relations` · `sort` · `limit` · `aggregate`

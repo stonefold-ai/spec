@@ -4,8 +4,8 @@ The canonical home of the Stonefold specs: the intent format an agent emits, the
 language the gateway enforces, their JSON Schemas and worked examples, and the
 specification of the conformance test kit that certifies any implementation against them.
 
-One sentence for the whole stack: **the agent speaks SIF; Stonefold enforces; the rules
-are carved in Stele — and nothing else can act.**
+One sentence for the whole stack: **the agent emits declared intents; Stonefold
+enforces; the rules are carved in Stele — and nothing else can act.**
 
 ## What's here
 

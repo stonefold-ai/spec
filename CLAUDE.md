@@ -17,8 +17,8 @@ specification of the conformance TCK.
 
 **Stonefold** is the product; the enforcement component is the **gateway**; the policy
 language is **Stele** (files `*.stele.yaml`, `apiVersion: stele/v0.1`); the intent format
-the agent emits is **SIF**. One sentence: *the agent speaks SIF; Stonefold enforces; the
-rules are carved in Stele — and nothing else can act.* Old names (ACP, Interlock,
+the agent emits is **SIF**. One sentence: *the agent emits declared intents; Stonefold
+enforces; the rules are carved in Stele — and nothing else can act.* Old names (ACP,
 agent-control-protocol) are fully retired; the rename record is `docs/renaming.md` in the
 stonefold repo.
 

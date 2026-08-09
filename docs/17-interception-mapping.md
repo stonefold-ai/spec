@@ -69,8 +69,8 @@ someone declares what it means.
    capability mean?" becomes a reviewable document — frequently the first such document
    the organisation has ever had (docs/16, Stage 0). Compliance can hold the pen.
 6. **Nothing is thrown away on upgrade.** The mapping work *is* the registry review. The
-   same reviewed entries later generate the `submit_intent` schema for the SIF-native
-   binding — migration is per-entity removal of raw tools (docs/16, Stage 2), not a
+   same reviewed entries later generate the tool schemas of the declared surface —
+   migration is per-entity removal of raw tools (docs/16, Stage 2), not a
    re-authoring project.
 
 ## 4. Honest limits (unchanged from docs/02 and docs/16)
@@ -81,10 +81,10 @@ someone declares what it means.
 - **A mapped tool can itself be an escape hatch.** A raw `run_sql(query: string)` maps to
   *one* action however many things the string can do. The mapping layer flags free-form
   string arguments as high-risk pass-throughs requiring explicit acknowledgement
-  (docs/02 §1.2); the real fix is migrating that entity to SIF-native.
+  (docs/02 §1.2); the real fix is migrating that entity to a declared action.
 - **The table must be kept in sync** with a live tool estate. That maintenance burden is
-  the recurring cost of this binding — and the thing the SIF-native binding structurally
-  removes (one generated tool; nothing to sync).
+  the recurring cost of this binding — and the thing the declared surface structurally
+  removes (the tools are generated from the registry; there is nothing to sync).
 
 ## 5. "But declared vocabularies lost" — why the old objection is dead
 
