@@ -59,7 +59,7 @@ A policy document is YAML. Top-level keys:
 | `apiVersion` | SHOULD | Spec version, e.g. `stele/v0.1`. | — |
 | `agent` | **MUST** | The agent identity this policy governs. | §2 |
 | `extends` | MAY | List of fragment policies to compose/inherit. | §3.2 |
-| `defaults` | MAY | Document-wide defaults (`failureMode`, `audit`, `killable`). | §9–§11 |
+| `defaults` | MAY | Document-wide defaults (`failureMode`, `audit`, `killable`, `enforcement`). | §9–§11a |
 | `allow` | **MUST** | Permissions: actions the agent MAY attempt, by kind. | §6 |
 | `deny` | MAY | Explicit prohibitions; override `allow`. | §6 |
 | `scope` | MAY | Per-resource scope predicates injected below the model. | §6.3 |
@@ -627,6 +627,73 @@ defaults:
 
 ---
 
+## 10a. Enforcement mode (`defaults.enforcement`) — v0.4
+
+A deployment MAY be asked to decide every action exactly as it would when
+enforcing, record every verdict, and **act on none of them**. The audit then
+holds the counterfactual: what this policy would have done to real traffic.
+
+```yaml
+defaults:
+  enforcement: enforced      # enforced (default) | advisory
+```
+
+- `enforced` — verdicts are acted on. MUST be the default, and MUST be the
+  reading of any policy that does not carry the key.
+- `advisory` — verdicts are computed and recorded; the action proceeds as though
+  the gateway were not in the path.
+
+**Two keys, not one.** A policy declaring `advisory` takes effect **only** where
+the deployment configuration also permits advisory for that agent. A gateway
+whose deployment has not permitted it MUST refuse the policy at load (a
+validation error, §13 rule 25) rather than silently enforcing or silently not
+enforcing. The reason is the failure shape this specification exists to prevent:
+a single line in a document that turns the entire control off is a control that
+is present and irrelevant. Both keys are required so that turning enforcement
+off is an act of the deployment, recorded where deployments are recorded.
+
+**What advisory does not change.** The decision path. An advisory deployment and
+an enforcing one MUST compute the same verdict for the same input — same
+resolution, same authorization, same gates, same order (§12). Advisory is a
+translation *between* the verdict and its consequences, never a different
+verdict. Everything a report built on this data claims rests on that identity;
+the conformance kit checks it directly (docs/12, profile `advisory`, check A8).
+
+**What it does change**, and this list is exhaustive:
+
+1. A `deny`, `hold` or fail-closed `halt` proceeds as an allow. The verdict that
+   would have stopped it is written to the record (§11 `advised`), never
+   returned to the agent — an agent that learns which of its actions are
+   ungoverned is no longer producing the traffic being measured.
+2. A held action stages **no approval**. Nobody is going to answer a question
+   about an effect that already happened; the report counts the questions
+   instead.
+3. A scope predicate is **measured, not applied**. Narrowing a read would hand
+   the agent fewer rows than it gets without the gateway, so the read runs
+   unscoped and the record carries what the predicate would have removed (§11
+   `scopeWouldRemove`). This applies wherever scope would otherwise be enforced,
+   including re-assertion at dispatch.
+4. An action the gateway cannot judge — an unresolvable name, a dependency
+   failure — is recorded `coverage: unjudged` and never counted as an allow.
+   Where the gateway also cannot forward it, the action fails and is recorded
+   the same way.
+
+**What it does not change, and MUST NOT.** A kill order (§9) still halts. It is
+an operator pulling a cord, not a policy verdict, and an advisory deployment
+whose operator cannot stop an agent is not safe to run. The same holds where the
+kill store is unreadable: the gateway cannot know whether the cord has been
+pulled, and that one guarantee outranks transparency. An advisory deployment is
+therefore not perfectly transparent, and MUST say so rather than claim it is.
+
+**Mixing.** Enforcement mode is a property of a policy document, so it is a
+property of an agent. One deployment MAY run one agent advisory and another
+enforcing; a single document MUST NOT mix. An advisory dataset with enforced
+exceptions is not a counterfactual — the enforced refusals change the traffic
+that follows them, and the record can no longer say what the estate does
+unobserved.
+
+---
+
 ## 11. Audit (`audit`)
 Levels: `none` | `basic` (decisions only) | `full` (decisions + parameters + gate results). Regulated deployments SHOULD use `full`. Every evaluated action — **allowed, held, denied, or halted** — produces one append-only record. Required fields at `full`:
 
@@ -645,6 +712,10 @@ Levels: `none` | `basic` (decisions only) | `full` (decisions + parameters + gat
 | `obligationRefs` | Registry + obligation/line id(s) a `requireMatch` decision matched, with the candidate count (`1`, `0`, or `n>1` for a held-ambiguous decision). The **entitlement-side** lineage key, complementing `resultRefs`: `resultRefs` locate what the effect *produced*; `obligationRefs` locate what *entitled* it. |
 | `consumption` | `reserved` \| `consumed` \| `released`, with the consume receipt id; for a `window`-capability registry, the declared residual window (priced, not hidden). |
 | `correlationId` | Session/transaction id for replay. |
+| `enforcement` | v0.4: `enforced` \| `advisory` — what the deployment DID with the verdict (§10a). **Required on every record** where a deployment supports advisory: a record that could have come from either is evidence of nothing, and a figure averaged across the two is not a measurement. A record written before this field existed reads `enforced`, which is what it was. |
+| `advised` | v0.4: the verdict enforcement would have reached — decision, deciding rule, reason code, retry class. Present only where the deployment diverged from the policy; absent on an enforced record and on an advisory record that was going to allow anyway. It marks divergence, not mode. |
+| `coverage` | v0.4: `judged` \| `unjudged` — whether the gateway could decide this action at all. `unjudged` covers what it could not resolve and what a dependency failure decided for it; such a record MUST NOT be counted as an allow or as a refusal. The honest half of a coverage claim. |
+| `scopeWouldRemove` | v0.4: on a read an advisory deployment ran unscoped, what the scope predicate would have removed — counts and the evaluation bound, never the values (§10a). Absent where no scope applied. |
 
 **Transactional audit.** For an executed or settled `effect`, the audit record **MUST** be written in the **same transaction** as the state change it records (the outbox settle), so there can be neither an effect that occurred without a record nor a record of an effect that did not occur. Refusals and holds are recorded **before** the result is returned to the agent. Best-effort side-channel logging is **not** sufficient for the audit log.
 
@@ -791,6 +862,8 @@ Held rows **expire actively**: the gateway MUST sweep held rows (the dispatch wo
 17. `onAmbiguous: allow` ⇒ **error** (illegal value; §7.16 — the gateway never auto-selects among candidate obligations).
 18. A check declared `holdCapable: true` with no declared `reasonCodes` ⇒ **error** (every hold it returns would be code-less and resolve fail, §7.6 rule 2); a hold-capable check gated with no `resolvers` and no visible deployment default resolver role ⇒ **warn** (§12; the warning names the deployment fallback).
 19. A gate that bounds a **single request** by an amount — a `valueLimit`, or a `requireApproval`/`dualAuthorization` whose `when` clause tests an amount — with **no** aggregate gate (`spendLimit`/`rate`/`quota`) on the same action ⇒ **warn**. The same total split across smaller requests evades a per-item threshold; the aggregate is what closes it. Advisory, because a per-item threshold is incomplete rather than wrong and some actions genuinely want no aggregate.
+25. `defaults.enforcement: advisory` in a deployment that does not permit advisory for this agent ⇒ **error**, at load (§10a). Not a warning and not a silent downgrade to enforcing: an operator who believes a policy is advisory while the gateway enforces it will route traffic they did not intend to have refused, and one who believes the reverse has a control they do not have. A policy declaring `advisory` where the deployment permits it SHOULD also be surfaced as a lint **warning** — enforcement being off is worth saying out loud every time the document is validated.
+
 22. A gate's `reads:` naming a source the registry does not declare in `sources` ⇒ **error** (it can only ever resolve unavailable). A gate that declares `reads:` and no `onUnavailable` ⇒ **warn**: it inherits deny, so a permanently unreachable source makes the action permanently impossible, and the author should say whether that is what they want. `onStale: allow` ⇒ **warn**, on the same grounds as `failureMode: open` — the gate will keep deciding from content past its own review date.
 21. An `items.field` that is not a declared `data` field of the same action ⇒ **error** — the action would never fan out, so every per-item gate on it is inert and the author's mistake is invisible at runtime. An action that fans out (`independent: true`) with no `maxItems` ⇒ **warn**: one call becomes as many gate evaluations as the actor chooses to send.
 20. `dispositionIsDeclared` named as a `precondition` check on an action whose registry entry declares no `closure` ⇒ **error** (the check has nothing to read; §7.6). An action that declares `closure` while no policy rule names `dispositionIsDeclared` on it ⇒ **warn** — a declared disposition vocabulary that nothing enforces is decoration, and the audit will show closures nobody checked.
