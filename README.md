@@ -13,7 +13,7 @@ This describes one implemented system: the reference gateway (Python, 552 automa
 tests against real infrastructure), certified by the TCK in-process and over the wire.
 Three estates — accounts payable, platform operations, and a results worklist — were
 built as working systems, driven by real language models, and allowed to fail before the
-controls were written; they are what earned v0.3.
+controls were written; they are what earned v0.3. v0.4 adds the advisory profile, earned by implementation and conformance certification rather than by an estate — no pilot has run it yet, and the document says so.
 
 Every gate in the catalog is implemented in the reference and covered by the kit. The
 right-hand column below is the harder standard: whether a built estate, driven by a real
@@ -47,7 +47,7 @@ what the schemas are for.
 | Artifact | Where | Status |
 |---|---|---|
 | **SIF** — the wire format the agent speaks (the five action kinds + the intent shape) | `docs/00-sif-wire-format.md` | v0.3 |
-| **Stele** — the Stonefold policy language (*what's allowed*) | `docs/01-stele-policy-language.md` | v0.3 |
+| **Stele** — the Stonefold policy language (*what's allowed*) | `docs/01-stele-policy-language.md` | v0.4 |
 | Registry domain model (declaring resources, actions, states, scope predicates) | `docs/06-registry-domain-model.md` | |
 | Artifacts & schemas (how the three schemas relate) | `docs/07-artifacts-and-schemas.md` | |
 | Glossary (every concept in plain language) | `docs/08-glossary.md` | |
