@@ -16,7 +16,8 @@
       "properties": {
         "failureMode": { "enum": ["closed", "open"] },
         "audit": { "enum": ["none", "basic", "full"] },
-        "killable": { "type": "boolean" }
+        "killable": { "type": "boolean" },
+        "enforcement": { "enum": ["enforced", "advisory"] }
       }
     },
     "allow": { "$ref": "#/$defs/permissionList" },
